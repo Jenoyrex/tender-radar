@@ -78,6 +78,7 @@ pip install -e ".[dev]"            # add ,embeddings for the sentence-transforme
 tender-radar update                # backfill the last 60 days from TED (~2 min)
 tender-radar build                 # writes site/
 tender-radar evaluate              # prints the evaluation tables (needs the embeddings extra)
+tender-radar label                 # hand-label the frozen queue in data/label-queue.csv
 pytest
 ```
 

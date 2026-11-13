@@ -77,7 +77,7 @@ def load_snapshot(path: Path) -> tuple[dt.date, list[dict]]:
 
 
 def show(p: match.Profile, t: dict, labels: dict, n: int, total: int) -> None:
-    w = lambda s, ind="  ": textwrap.fill(s, 100, initial_indent=ind, subsequent_indent=ind)
+    w = lambda s, ind="  ": textwrap.fill(s, 100, initial_indent=ind, subsequent_indent=" " * len(ind))
     cpvs = [f"{c} {labels.get(c, '')}".strip() for c in (t["cpv"] or "").split()]
     value = "not published" if t["value"] is None else f"{t['value']:,.0f} {t['currency']}" + (
         f" (≈ €{t['value_eur']:,.0f})" if t["value_eur"] and t["currency"] != "EUR" else "")
