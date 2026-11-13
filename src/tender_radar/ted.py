@@ -2,6 +2,7 @@
 
 import datetime as dt
 import gzip
+import hashlib
 import json
 import logging
 import time
@@ -17,7 +18,10 @@ FIELDS = [
     "classification-cpv", "publication-date", "deadline-receipt-tender-date-lot",
     "deadline-receipt-request-date-lot", "estimated-value-proc",
     "estimated-value-cur-proc", "estimated-value-lot", "estimated-value-cur-lot", "links",
+    "main-classification-proc",
 ]
+# Raw cache files are keyed by the field list, so adding a field re-fetches automatically.
+CACHE_TAG = hashlib.sha1(" ".join(FIELDS).encode()).hexdigest()[:8]
 log = logging.getLogger(__name__)
 
 
@@ -80,7 +84,7 @@ def fetch_day(day: dt.date, cfg: dict) -> list[dict]:
 
 
 def raw_path(raw_dir: Path, day: dt.date) -> Path:
-    return Path(raw_dir) / f"{day.isoformat()}.json.gz"
+    return Path(raw_dir) / f"{day.isoformat()}.{CACHE_TAG}.json.gz"
 
 
 def collect(start: dt.date, end: dt.date, cfg: dict, refresh_days: int = 2) -> tuple[list[dt.date], list[dt.date]]:

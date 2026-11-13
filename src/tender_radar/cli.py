@@ -58,6 +58,28 @@ def cmd_evaluate(cfg, args):
     return 0
 
 
+def cmd_label(cfg, args):
+    from . import label
+    data = Path(cfg["db_path"]).parent
+    queue_path, snap_path, labels_path = data / "label-queue.csv", data / "label-snapshot.json.gz", data / "labels.csv"
+    if args.make_queue:
+        if queue_path.exists() and not args.force:
+            log.error("%s exists; pass --force to replace it (existing labels may no longer match)", queue_path)
+            return 1
+        today = dt.date.today()
+        queue, open_ = label.make_queue(db.load(db.connect(cfg["db_path"])), ROOT / "profiles", data, today)
+        with open(queue_path, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, label.QUEUE_COLS, lineterminator="\n")
+            w.writeheader()
+            w.writerows(queue)
+        label.save_snapshot(snap_path, today, open_)
+        log.info("wrote %d pairs to %s", len(queue), queue_path)
+        return 0
+    _, snapshot = label.load_snapshot(snap_path)
+    label.run(snapshot, ROOT / "profiles", queue_path, labels_path)
+    return 0
+
+
 def main(argv=None):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     p = argparse.ArgumentParser(prog="tender-radar")
@@ -67,11 +89,14 @@ def main(argv=None):
     sub.add_parser("build", help="generate site pages and RSS feeds")
     e = sub.add_parser("evaluate", help="CPV-based offline evaluation (prints markdown)")
     e.add_argument("--models", nargs="*", default=["all-MiniLM-L6-v2", match.EMBED_MODEL])
+    lb = sub.add_parser("label", help="hand-label (profile, tender) pairs into data/labels.csv")
+    lb.add_argument("--make-queue", action="store_true", help="sample a new frozen queue of pairs")
+    lb.add_argument("--force", action="store_true")
     args = p.parse_args(argv)
     cfg = load_config()
     for k in ("db_path", "raw_dir", "site_dir"):
         cfg[k] = ROOT / cfg[k]
-    sys.exit({"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate}[args.cmd](cfg, args))
+    sys.exit({"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label}[args.cmd](cfg, args))
 
 
 if __name__ == "__main__":

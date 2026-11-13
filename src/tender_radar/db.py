@@ -18,6 +18,9 @@ def connect(path) -> sqlite3.Connection:
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
+    cols = [r[1] for r in con.execute("PRAGMA table_info(tenders)")]
+    if cols and cols != COLUMNS:  # schema changed: the DB is a cache, rebuild it
+        con.execute("DROP TABLE tenders")
     con.executescript(SCHEMA)
     return con
 

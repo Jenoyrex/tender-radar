@@ -82,3 +82,19 @@ def test_db_upsert_dedupes(tmp_path):
 def test_build_query():
     q = build_query(dt.date(2026, 11, 2), ["72", "48"], ["DEU"])
     assert q == "PD=20261102 AND form-type=competition AND (classification-cpv=72* OR classification-cpv=48*) AND buyer-country IN (DEU)"
+
+
+def test_english_fields():
+    n = copy.deepcopy(RAW[0])
+    n["notice-title"] = {"eng": "Sweden – Software development services – Nytt system"}
+    n["title-proc"] = {"swe": "Nytt system"}
+    n["main-classification-proc"] = ["72212000"]
+    r = clean(n)
+    assert r["cpv_label"] == "Software development services"
+    assert r["main_cpv"] == "72212000"
+    assert r["title_english"] is None  # the template title is not a translation
+    n["title-proc"] = {"swe": "Nytt system", "eng": "New system"}
+    assert clean(n)["title_english"] == "New system"
+    n["main-classification-proc"] = ["7221"]
+    with pytest.raises(SchemaError):
+        clean(n)

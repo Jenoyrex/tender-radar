@@ -42,6 +42,26 @@ def tender_text(t: dict) -> str:
     return f"{t['title'] or ''}. {t['description'] or ''}"
 
 
+E5_MODEL = "intfloat/multilingual-e5-small"
+
+
+def cpv_label_map(tenders: list[dict]) -> dict:
+    """{8-digit CPV: English label}, learned from TED's notice-title template."""
+    return {t["main_cpv"]: t["cpv_label"] for t in tenders if t.get("main_cpv") and t.get("cpv_label")}
+
+
+def english_text(t: dict, labels: dict) -> str:
+    """English-only view: TED's English title (country – CPV label – title) plus
+    the English labels of all the tender's CPV codes. Contains CPV information,
+    so it must not be scored against the CPV proxy without a warning."""
+    extra = sorted({labels[c] for c in (t["cpv"] or "").split() if c in labels})
+    return f"{t['title_en'] or ''}. {'; '.join(extra)}"
+
+
+def e5_text(t: dict) -> str:
+    return f"{t['title_en'] or ''}. {t['description'] or ''}"
+
+
 # ---- similarity models -------------------------------------------------------
 
 def tfidf_similarity(query: str, docs: list[str], analyzer: str = "char_wb") -> np.ndarray:
@@ -61,20 +81,22 @@ def tfidf_similarity(query: str, docs: list[str], analyzer: str = "char_wb") -> 
 _models = {}
 
 
-def embed(texts: list[str], model_name: str = EMBED_MODEL) -> np.ndarray:
+def embed(texts: list[str], model_name: str = EMBED_MODEL, prefix: str = "") -> np.ndarray:
+    """prefix: e5 models expect "query: " / "passage: "."""
     from sentence_transformers import SentenceTransformer  # optional dependency
     if model_name not in _models:
         _models[model_name] = SentenceTransformer(model_name, device="cpu")
-    return _models[model_name].encode(texts, batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+    return _models[model_name].encode([prefix + x for x in texts], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
 
 
-def cached_embeddings(tenders: list[dict], path: Path, model_name: str = EMBED_MODEL) -> dict:
+def cached_embeddings(tenders: list[dict], path: Path, model_name: str = EMBED_MODEL,
+                      text_fn=tender_text, prefix: str = "") -> dict:
     """{id: vector}, embedding only tenders not already in the .npz cache at `path`."""
     path = Path(path)
     cache = dict(np.load(path)) if path.exists() else {}
     missing = [t for t in tenders if t["id"] not in cache]
     if missing:
-        cache |= dict(zip((t["id"] for t in missing), embed([tender_text(t) for t in missing], model_name)))
+        cache |= dict(zip((t["id"] for t in missing), embed([text_fn(t) for t in missing], model_name, prefix)))
         path.parent.mkdir(parents=True, exist_ok=True)
         keep = {t["id"] for t in tenders}
         np.savez(path, **{k: v for k, v in cache.items() if k in keep})

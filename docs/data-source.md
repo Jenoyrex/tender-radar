@@ -60,6 +60,29 @@ A day with no publications (e.g. Sunday `PD=20261108`) returns `totalNoticeCount
 
 Field names from the brief that do **not** exist: `deadline-receipt-tender-date-proc`. `estimated-value-glo` exists but was empty in every sample.
 
+## Are titles available in English? (checked 2026-11-13, 5,414 notices)
+
+| What | Share |
+|---|---|
+| `notice-title` has an `eng` entry | **100%** (5,414) |
+| …but its title part is actually translated | **~0%**: copied verbatim in 4,938 of 5,003 non-English notices; the other 65 are bilingual originals, not translations |
+| `title-proc` has a genuine English title (`eng` key) | **7.6%** (411), mostly Irish, Maltese and EU-institution buyers |
+| English CPV label extractable from `notice-title` | **100%** (middle part of *country – label – title*) |
+| `main-classification-proc` (main CPV) present | **100%** |
+
+So TED's API offers no translated titles. The English `notice-title` is a
+template: English country name, English label of the main CPV, then the title
+in the original language. The cleaned table now keeps:
+
+- `title_en`: the full template title (used for display);
+- `cpv_label`: the English label of the main CPV;
+- `main_cpv`: from `main-classification-proc`;
+- `title_english`: the genuine English title when the buyer supplied one, else null.
+
+Pairing `main_cpv` with `cpv_label` across the corpus gives an English label map
+for 548 of the 1,542 distinct CPV codes seen, which covers all codes of 78% of
+tenders (`match.cpv_label_map`).
+
 ## Implications for the design
 
 1. **Multilingual text.** Only the title is translated; descriptions are in the

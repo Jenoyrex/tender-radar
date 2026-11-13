@@ -13,6 +13,7 @@ EUR_PER_UNIT = {
 COLUMNS = [
     "id", "title", "title_en", "description", "buyer", "country", "cpv",
     "value", "currency", "value_eur", "published", "deadline", "link", "notice_type",
+    "main_cpv", "cpv_label", "title_english",
 ]
 
 
@@ -71,6 +72,12 @@ def clean(n: dict) -> dict:
     countries = _expect(n, "buyer-country", list)
     title_orig = _first_lang(_expect(n, "title-proc", dict))
     title_en = _first_lang(_expect(n, "notice-title", dict))
+    # notice-title is "Country – CPV label – original title": only the label is really English.
+    parts = (title_en or "").split(" – ", 2)
+    main = (n.get("main-classification-proc") or [None])[0]
+    if main is not None and not re.fullmatch(r"\d{8}", main):
+        raise SchemaError(f"{nid}: bad main CPV {main!r}")
+    eng = _first_lang({"eng": n["title-proc"]["eng"]}) if "eng" in n["title-proc"] else None
     desc = _first_lang(n.get("description-proc")) or _first_lang(n.get("description-lot"))
     deadlines = (n.get("deadline-receipt-tender-date-lot") or []) + (n.get("deadline-receipt-request-date-lot") or [])
     value, cur = _value(n)
@@ -91,6 +98,9 @@ def clean(n: dict) -> dict:
         "deadline": max(_date(d) for d in deadlines) if deadlines else None,
         "link": f"https://ted.europa.eu/en/notice/-/detail/{nid}",
         "notice_type": n.get("notice-type"),
+        "main_cpv": main,
+        "cpv_label": parts[1] if len(parts) == 3 else None,
+        "title_english": eng,  # genuine English title, only ~8% of notices
     }
 
 
