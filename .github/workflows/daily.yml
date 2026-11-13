@@ -14,12 +14,12 @@ jobs:
     timeout-minutes: 45
     environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: {python-version: "3.12", cache: pip}
       # SQLite DB and raw TED responses. If the cache is ever
       # evicted, `update` simply backfills 60 days again (~2 minutes).
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             data/tenders.sqlite
@@ -32,9 +32,9 @@ jobs:
         continue-on-error: true   # still rebuild the site from what we have; fail at the end
         run: tender-radar update
       - run: tender-radar build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with: {path: site}
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
       - name: Commit dataset snapshot
         run: |
