@@ -44,7 +44,7 @@ def tender_text(t: dict) -> str:
 
 # ---- similarity models -------------------------------------------------------
 
-def tfidf_similarity(query: str, docs: list[str], analyzer: str = "word") -> np.ndarray:
+def tfidf_similarity(query: str, docs: list[str], analyzer: str = "char_wb") -> np.ndarray:
     big = len(docs) >= 50  # document-frequency cut-offs only make sense on a real corpus
     df = dict(min_df=2, max_df=0.5) if big else {}
     if analyzer == "word":

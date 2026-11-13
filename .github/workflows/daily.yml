@@ -17,19 +17,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
-      # SQLite DB, raw TED responses and embedding cache. If the cache is ever
+      # SQLite DB and raw TED responses. If the cache is ever
       # evicted, `update` simply backfills 60 days again (~2 minutes).
       - uses: actions/cache@v4
         with:
           path: |
             data/tenders.sqlite
             data/raw
-            data/emb-*.npz
-            ~/.cache/huggingface
           key: data-${{ github.run_id }}
           restore-keys: data-
-      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
-      - run: pip install -e ".[embeddings]"
+      - run: pip install -e .   # add [embeddings] + CPU torch if config.yaml sets match_method: embeddings
       - name: Fetch new notices from TED
         id: update
         continue-on-error: true   # still rebuild the site from what we have; fail at the end

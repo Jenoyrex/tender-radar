@@ -9,3 +9,6 @@ raw_dir: data/raw
 site_dir: site
 user_agent: "tender-radar/0.1 (+https://github.com/Jenoyrex/tender-radar)"
 request_delay_seconds: 1.5
+# Matcher: "tfidf" (character 3-5-gram TF-IDF, chosen by docs/evaluation.md) or "embeddings"
+# (needs: pip install -e ".[embeddings]").
+match_method: tfidf

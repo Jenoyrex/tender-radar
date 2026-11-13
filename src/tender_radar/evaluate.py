@@ -41,21 +41,27 @@ def in_group(t, g):
 
 
 def methods(tenders, emb_cache):
-    vecs = {
-        name: np.stack([cache[t["id"]] for t in tenders]) for name, cache in emb_cache.items()
-    }
+    """Each method: score(query_text, picked_idx, cand_idx) -> similarities for cand_idx.
+
+    TF-IDF is fitted once on the whole corpus (no labels involved) for speed.
+    Setting A gives embeddings the centroid of the picked tenders' vectors, because
+    the models truncate input at 128 tokens and would otherwise see one tender only.
+    """
+    from sklearn.feature_extraction.text import TfidfVectorizer
     docs = [match.tender_text(t) for t in tenders]
+    out = {}
+    for label, kw in (("TF-IDF words (baseline)", dict(strip_accents="unicode")),
+                      ("TF-IDF char 3-5 grams", dict(analyzer="char_wb", ngram_range=(3, 5)))):
+        vec = TfidfVectorizer(sublinear_tf=True, min_df=2, max_df=0.5, **kw).fit(docs)
+        m = vec.transform(docs)
+        out[label] = lambda q, picked, cand, vec=vec, m=m: (m[cand] @ vec.transform([q]).T).toarray().ravel()
+    for name, cache in emb_cache.items():
+        v = np.stack([cache[t["id"]] for t in tenders])
 
-    def make(kind, name=None):
-        def score(query, idx):
-            if kind == "emb":
-                return vecs[name][idx] @ match.embed([query], name)[0]
-            return match.tfidf_similarity(query, [docs[i] for i in idx], analyzer=kind)
-        return score
-
-    out = {"TF-IDF words (baseline)": make("word"), "TF-IDF char 3-5 grams": make("char_wb")}
-    for name in emb_cache:
-        out[f"Embeddings: {name}"] = make("emb", name)
+        def score(q, picked, cand, v=v, name=name):
+            qv = v[picked].mean(0) if picked else match.embed([q], name)[0]
+            return v[cand] @ (qv / np.linalg.norm(qv))
+        out[f"Embeddings: {name}"] = score
     return out
 
 
@@ -75,7 +81,7 @@ def run(tenders: list[dict], emb_cache: dict) -> dict:
                 query = short_text if setting == "short" else " ".join(match.tender_text(tenders[i])[:600] for i in picked)
                 rows = {"Random ranking": {k: truth.mean() for k in KS}}
                 for mname, score in ms.items():
-                    order = np.argsort(-score(query, cand))
+                    order = np.argsort(-score(query, picked if setting == "sample" else [], cand))
                     rows[mname] = {k: truth[order[:k]].mean() for k in KS}
                 for mname, pk in rows.items():
                     acc = res[setting].setdefault(mname, {}).setdefault(g, {k: [] for k in KS})
