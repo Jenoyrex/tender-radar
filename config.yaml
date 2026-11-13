@@ -1,0 +1,11 @@
+# Sector filter: CPV prefixes (TED classification). 72 = IT services.
+# Change this one line to follow another sector, e.g. ["45"] for construction.
+cpv_prefixes: ["72"]
+# Empty list = all countries (ISO 3166-1 alpha-3, as TED uses them).
+countries: []
+backfill_days: 60
+db_path: data/tenders.sqlite
+raw_dir: data/raw
+site_dir: site
+user_agent: "tender-radar/0.1 (+https://github.com/Jenoyrex/tender-radar)"
+request_delay_seconds: 1.5
