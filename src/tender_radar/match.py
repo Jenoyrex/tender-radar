@@ -98,8 +98,7 @@ def cached_embeddings(tenders: list[dict], path: Path, model_name: str = EMBED_M
     if missing:
         cache |= dict(zip((t["id"] for t in missing), embed([text_fn(t) for t in missing], model_name, prefix)))
         path.parent.mkdir(parents=True, exist_ok=True)
-        keep = {t["id"] for t in tenders}
-        np.savez(path, **{k: v for k, v in cache.items() if k in keep})
+        np.savez(path, **cache)  # ponytail: never pruned; ~1.5 KB per notice
     return cache
 
 

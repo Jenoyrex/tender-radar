@@ -98,8 +98,14 @@ Precision@10, averaged over 11 IT sub-sectors:
 
 The sentence-transformers models **did not beat TF-IDF**, so the site ships the
 simpler character n-gram TF-IDF, which works across languages without PyTorch.
-All methods are only 2–3× better than random. The full method, per-group numbers
-and caveats are in [docs/evaluation.md](docs/evaluation.md).
+All methods are only 2–3× better than random.
+
+**Round 2** added 150 labelled (profile, tender) pairs (144 labelled by an AI, 6 by a
+human) and a held-out dev/test split. TF-IDF on English titles + CPV labels,
+multilingual-e5-small and a blend were tested: **none clearly beat the current
+model on the test half** (P@10 0.27 for both current and the best challenger),
+so nothing changed. The full method, both tables and caveats are in
+[docs/evaluation.md](docs/evaluation.md).
 
 ## Limitations
 

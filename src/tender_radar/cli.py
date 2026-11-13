@@ -52,6 +52,10 @@ def cmd_build(cfg, args):
 
 def cmd_evaluate(cfg, args):
     from . import evaluate
+    if args.labels:
+        from . import evaluate_labels
+        print(evaluate_labels.to_markdown(evaluate_labels.run(Path(cfg["db_path"]).parent, ROOT / "profiles")))
+        return 0
     tenders = db.load(db.connect(cfg["db_path"]))
     md = evaluate.main(tenders, Path(cfg["db_path"]).parent, args.models)
     print(md)
@@ -88,7 +92,8 @@ def main(argv=None):
     u.add_argument("--days", type=int, help="look back this many days (default: backfill_days)")
     sub.add_parser("build", help="generate site pages and RSS feeds")
     e = sub.add_parser("evaluate", help="CPV-based offline evaluation (prints markdown)")
-    e.add_argument("--models", nargs="*", default=["all-MiniLM-L6-v2", match.EMBED_MODEL])
+    e.add_argument("--labels", action="store_true", help="evaluate on hand labels instead of the CPV proxy")
+    e.add_argument("--models", nargs="*", default=[match.EMBED_MODEL, match.E5_MODEL])
     lb = sub.add_parser("label", help="hand-label (profile, tender) pairs into data/labels.csv")
     lb.add_argument("--make-queue", action="store_true", help="sample a new frozen queue of pairs")
     lb.add_argument("--force", action="store_true")

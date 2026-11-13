@@ -41,27 +41,42 @@ def in_group(t, g):
 
 
 def methods(tenders, emb_cache):
-    """Each method: score(query_text, picked_idx, cand_idx) -> similarities for cand_idx.
+    """Each method: score(short_text, picked_idx, cand_idx) -> similarities for cand_idx.
+    picked_idx empty = setting B (use short_text); else setting A (use the picked tenders).
 
     TF-IDF is fitted once on the whole corpus (no labels involved) for speed.
     Setting A gives embeddings the centroid of the picked tenders' vectors, because
-    the models truncate input at 128 tokens and would otherwise see one tender only.
+    the models truncate input at 128-512 tokens and would otherwise see one tender only.
+    Methods marked "sees CPV" read TED's English title / CPV labels, which leak the
+    proxy's answer; their proxy scores are not comparable and are shown for completeness.
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
-    docs = [match.tender_text(t) for t in tenders]
+    labels = match.cpv_label_map(tenders)
+    native = [match.tender_text(t) for t in tenders]
+    english = [match.english_text(t, labels) for t in tenders]
     out = {}
-    for label, kw in (("TF-IDF words (baseline)", dict(strip_accents="unicode")),
-                      ("TF-IDF char 3-5 grams", dict(analyzer="char_wb", ngram_range=(3, 5)))):
+    for name, docs, kw in (("TF-IDF words (baseline)", native, dict(strip_accents="unicode")),
+                           ("TF-IDF char 3-5 grams (current)", native, dict(analyzer="char_wb", ngram_range=(3, 5))),
+                           ("TF-IDF English title + CPV labels (sees CPV)", english, dict(strip_accents="unicode"))):
         vec = TfidfVectorizer(sublinear_tf=True, min_df=2, max_df=0.5, **kw).fit(docs)
         m = vec.transform(docs)
-        out[label] = lambda q, picked, cand, vec=vec, m=m: (m[cand] @ vec.transform([q]).T).toarray().ravel()
+
+        def score(q, picked, cand, vec=vec, m=m, docs=docs):
+            q = " ".join(docs[i][:600] for i in picked) if picked else q
+            return (m[cand] @ vec.transform([q]).T).toarray().ravel()
+        out[name] = score
     for name, cache in emb_cache.items():
         v = np.stack([cache[t["id"]] for t in tenders])
+        e5 = name == match.E5_MODEL
 
-        def score(q, picked, cand, v=v, name=name):
-            qv = v[picked].mean(0) if picked else match.embed([q], name)[0]
+        def score(q, picked, cand, v=v, name=name, e5=e5):
+            qv = v[picked].mean(0) if picked else match.embed([q], name, "query: " if e5 else "")[0]
             return v[cand] @ (qv / np.linalg.norm(qv))
-        out[f"Embeddings: {name}"] = score
+        out["e5-small, English title + description (sees CPV)" if e5 else f"Embeddings: {name}"] = score
+    char, e5name = "TF-IDF char 3-5 grams (current)", "e5-small, English title + description (sees CPV)"
+    if e5name in out:
+        z = lambda x: (x - x.mean()) / (x.std() or 1)
+        out["Blend 0.5 char-TF-IDF + 0.5 e5 (sees CPV)"] = lambda q, p, c: 0.5 * z(out[char](q, p, c)) + 0.5 * z(out[e5name](q, p, c))
     return out
 
 
@@ -78,10 +93,9 @@ def run(tenders: list[dict], emb_cache: dict) -> dict:
                 buyers = {tenders[i]["buyer"] for i in picked}
                 cand = [i for i, t in enumerate(tenders) if i not in picked and t["buyer"] not in buyers]
                 truth = np.array([in_group(tenders[i], g) for i in cand])
-                query = short_text if setting == "short" else " ".join(match.tender_text(tenders[i])[:600] for i in picked)
                 rows = {"Random ranking": {k: truth.mean() for k in KS}}
                 for mname, score in ms.items():
-                    order = np.argsort(-score(query, picked if setting == "sample" else [], cand))
+                    order = np.argsort(-score(short_text, picked if setting == "sample" else [], cand))
                     rows[mname] = {k: truth[order[:k]].mean() for k in KS}
                 for mname, pk in rows.items():
                     acc = res[setting].setdefault(mname, {}).setdefault(g, {k: [] for k in KS})
@@ -108,5 +122,8 @@ def to_markdown(res: dict, n_tenders: int) -> str:
 
 
 def main(tenders: list[dict], data_dir: Path, models: list[str]) -> str:
-    emb = {m: match.cached_embeddings(tenders, Path(data_dir) / f"emb-{m}.npz", m) for m in models}
+    emb = {m: match.cached_embeddings(tenders, Path(data_dir) / f"emb-{m}.npz", m) for m in models if m != match.E5_MODEL}
+    if match.E5_MODEL in models:
+        emb[match.E5_MODEL] = match.cached_embeddings(tenders, Path(data_dir) / "emb-e5-small.npz", match.E5_MODEL,
+                                                      text_fn=match.e5_text, prefix="passage: ")
     return to_markdown(run(tenders, emb), len(tenders))
