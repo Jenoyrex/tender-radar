@@ -124,7 +124,14 @@ document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{dir=sortKey=
 """
 
 
-def index_page(summaries) -> str:
+def row(r) -> str:
+    """Same markup as INDEX_JS render(), so the server-rendered rows match the JS ones."""
+    v = "–" if r["value_eur"] is None else f"€{round(r['value_eur']):,}"
+    return (f'<tr><td><a href="{escape(r["link"])}">{escape(r["title_en"] or "")}</a><div class=meta>{escape(r["buyer"] or "")}</div></td>'
+            f'<td>{r["country"]}</td><td class=num>{v}</td><td class=num>{r["deadline"] or "–"}</td><td class=num>{r["published"]}</td></tr>')
+
+
+def index_page(summaries, rows=()) -> str:
     profs = "".join(f"""<div class="card"><h3><a href="p/{p.slug}.html">{escape(p.name)}</a></h3>
 <div class="meta">{n} open tenders pass the filters · <a href="p/{p.slug}.xml">RSS</a></div><p class="meta">{escape(p.description)}</p></div>"""
                     for p, n in summaries)
@@ -132,7 +139,7 @@ def index_page(summaries) -> str:
 <p>Open EU public tenders in IT &amp; software services (CPV 72), ranked by fit for small businesses.
 Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-your-own-profile">Add your own profile</a>.</p>
 <h2>Example profiles</h2>{profs}
-<h2>Browse open tenders</h2><p class="meta" id="count">Loading…</p>
+<h2>Browse open tenders</h2><p class="meta" id="count">{min(len(rows), 50)} newest of {len(rows)} open tenders (filters need JavaScript)</p>
 <div class="filters">
 <label>Search<input id="f-q" type="search" placeholder="title or buyer"></label>
 <label>Country<select id="f-country"><option value="">All</option></select></label>
@@ -143,7 +150,7 @@ Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-yo
 <label>Value known only<input id="f-known" type="checkbox"></label></div>
 <div class="tablewrap"><table><thead><tr><th data-k="title_en">Tender</th><th data-k="country">Country</th>
 <th data-k="value_eur">Value</th><th data-k="deadline">Deadline</th><th data-k="published">Published ▾</th></tr></thead>
-<tbody id="tb"></tbody></table></div><p class="meta">Showing at most 300 rows; narrow with the filters.</p>
+<tbody id="tb">{''.join(row(r) for r in rows[:50])}</tbody></table></div><p class="meta">Showing at most 300 rows; narrow with the filters.</p>
 <script>{INDEX_JS}</script>"""
     return page("tender-radar – EU tenders for small businesses", body)
 
@@ -172,8 +179,10 @@ def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfi
         n = sum(match.passes_filters(t, p, today) for t in open_)
         summaries.append((p, n))
     keep = ("id", "title_en", "buyer", "country", "cpv", "value_eur", "deadline", "published", "link")
-    (out / "tenders.json").write_text(json.dumps([{k: t[k] for k in keep} for t in open_], ensure_ascii=False,
+    # Newest first, matching the JS default sort, so server-rendered rows are what JS shows too.
+    rows = sorted(({k: t[k] for k in keep} for t in open_), key=lambda r: r["published"], reverse=True)
+    (out / "tenders.json").write_text(json.dumps(rows, ensure_ascii=False,
                                                  separators=(",", ":")), encoding="utf-8")
-    (out / "index.html").write_text(index_page(summaries), encoding="utf-8")
+    (out / "index.html").write_text(index_page(summaries, rows), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return open_

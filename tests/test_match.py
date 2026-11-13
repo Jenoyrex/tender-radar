@@ -63,7 +63,9 @@ def test_build_writes_pages(tmp_path):
     html = (tmp_path / "site" / "p" / "x.html").read_text(encoding="utf-8")
     assert "data analytics &lt;b&gt;" in html and "European Union" in html
     assert "<rss" in (tmp_path / "site" / "p" / "x.xml").read_text(encoding="utf-8")
-    assert "European Union" in (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    index = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+    assert "European Union" in index
+    assert index.count("<tr><td><a href=\"https://ted") == 2 and "data analytics &lt;b&gt;" in index  # rows present without JS
 
 
 def test_feedback_links(tmp_path):
