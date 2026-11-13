@@ -226,3 +226,4 @@ __marimo__/
 data/raw/
 site/
 .env
+.claude/

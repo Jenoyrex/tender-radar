@@ -1,0 +1,11 @@
+name: Small web studio (Portugal & Spain)
+description: >
+  We are a 12-person web studio. We design and build public-facing websites,
+  web portals and mobile apps, mostly on open-source CMS like WordPress and
+  Drupal. We care about accessibility (WCAG), UX design, and hosting and
+  maintaining the sites we build.
+countries: [PRT, ESP]
+cpv: ["7241", "7242", "7221", "7223"]
+min_value_eur: 10000
+max_value_eur: 750000
+exclude_keywords: [hardware, printers, impresoras, impressoras]

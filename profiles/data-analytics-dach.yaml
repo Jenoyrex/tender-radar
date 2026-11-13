@@ -1,0 +1,10 @@
+name: Data & BI consultancy (DACH + Benelux)
+description: >
+  Boutique data consultancy. We build data warehouses, ETL pipelines and
+  business-intelligence dashboards, migrate analytics to the cloud, and train
+  public-sector teams in data analysis, statistics and reporting.
+countries: [DEU, AUT, CHE, NLD, BEL, LUX]
+cpv: ["7231", "7232", "7222", "7226"]
+min_value_eur: 50000
+max_value_eur: 3000000
+exclude_keywords: [Hardware, Drucker, Kopierer]

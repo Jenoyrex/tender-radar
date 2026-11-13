@@ -1,0 +1,9 @@
+name: Managed IT support provider (Ireland, Nordics)
+description: >
+  Managed service provider for small public bodies: IT helpdesk, on-site
+  technical support, network installation and maintenance, Microsoft 365 and
+  cloud administration, backup and cybersecurity monitoring.
+countries: [IRL, DNK, SWE, FIN, NOR]
+cpv: ["7225", "7261", "7270", "7271", "7259"]
+max_value_eur: 2000000
+exclude_keywords: []

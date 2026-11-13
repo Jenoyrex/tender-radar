@@ -1,0 +1,161 @@
+"""Generate the static site: one HTML page + RSS feed per profile, and an index
+with a filterable table of open tenders."""
+
+import datetime as dt
+import json
+from email.utils import format_datetime
+from html import escape
+from pathlib import Path
+from xml.sax.saxutils import escape as xesc
+
+from . import match
+
+SITE_URL = "https://jenoyrex.github.io/tender-radar"
+ATTRIBUTION = ('Source: <a href="https://ted.europa.eu">TED – Tenders Electronic Daily</a>, '
+               '© European Union, Publications Office of the EU. Reused under Commission Decision 2011/833/EU. '
+               'tender-radar is unofficial and not affiliated with the EU. Always check the official notice.')
+TOP_N = 30
+
+CSS = """
+:root{--bg:#fbfaf7;--fg:#1d1d1b;--muted:#6b6a65;--line:#e4e1d8;--accent:#1f5f8b;--chip:#eef3f7}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#ecebe6;--muted:#9c9a92;--line:#2c2b28;--accent:#7fb6dd;--chip:#1f2a33}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:960px;margin:0 auto;padding:24px 16px 48px}a{color:var(--accent)}
+h1{font-size:1.6rem;margin:.2em 0}h2{font-size:1.15rem;margin:2em 0 .5em}.muted{color:var(--muted)}
+.card{border-top:1px solid var(--line);padding:14px 0}.card h3{font-size:1rem;margin:0 0 4px;line-height:1.35}
+.meta{font-size:.875rem;color:var(--muted)}.meta b{color:var(--fg);font-weight:600}
+.chips{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
+.chips li{background:var(--chip);border-radius:4px;padding:1px 7px;font-size:.8rem}
+.score{float:right;font-variant-numeric:tabular-nums;font-weight:600;margin-left:8px}
+footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.filters label{display:flex;flex-direction:column;font-size:.75rem;color:var(--muted);gap:2px}
+input,select{font:inherit;font-size:.9rem;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);min-width:0}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.875rem}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{position:sticky;top:0;background:var(--bg);cursor:pointer;white-space:nowrap}td.num{text-align:right;white-space:nowrap}
+"""
+
+
+def page(title: str, body: str, extra_head: str = "") -> str:
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)}</title>
+<style>{CSS}</style>{extra_head}</head><body><main>{body}<footer>{ATTRIBUTION}
+Generated {dt.date.today().isoformat()} by <a href="https://github.com/Jenoyrex/tender-radar">tender-radar</a>.</footer></main></body></html>"""
+
+
+def money(t) -> str:
+    if t["value"] is None:
+        return "not published"
+    s = f"{t['value']:,.0f} {t['currency']}"
+    return s if t["currency"] == "EUR" or t["value_eur"] is None else f"{s} (≈ €{t['value_eur']:,.0f})"
+
+
+def card(t) -> str:
+    chips = "".join(f"<li>{escape(r)}</li>" for r in t["reasons"])
+    return f"""<div class="card"><span class="score" title="match score">{t['score']:.2f}</span>
+<h3><a href="{t['link']}">{escape(t['title_en'] or t['title'])}</a></h3>
+<div class="meta"><b>{escape(t['buyer'] or '?')}</b> · {t['country']} · value {money(t)} ·
+deadline <b>{t['deadline'] or 'see notice'}</b> · published {t['published']}</div><ul class="chips">{chips}</ul></div>"""
+
+
+def rss(p: match.Profile, results: list[dict]) -> str:
+    now = format_datetime(dt.datetime.now(dt.timezone.utc))
+    items = "".join(f"""<item><title>{xesc(t['title_en'] or t['title'])}</title><link>{t['link']}</link>
+<guid isPermaLink="false">ted-{t['id']}</guid><pubDate>{format_datetime(dt.datetime.fromisoformat(t['published']).replace(tzinfo=dt.timezone.utc))}</pubDate>
+<description>{xesc(f"Score {t['score']:.2f}. Buyer: {t['buyer']} ({t['country']}). Value: {money(t)}. Deadline: {t['deadline'] or 'see notice'}. Why: {'; '.join(t['reasons'])}. Source: TED, © European Union.")}</description></item>"""
+                    for t in results)
+    return f"""<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel>
+<title>{xesc(p.name)} – tender-radar</title><link>{SITE_URL}/p/{p.slug}.html</link>
+<description>Open EU tenders matching this profile. Data: TED, © European Union. Unofficial.</description>
+<lastBuildDate>{now}</lastBuildDate>{items}</channel></rss>"""
+
+
+def profile_page(p: match.Profile, results: list[dict]) -> str:
+    filt = []
+    if p.countries:
+        filt.append("countries " + ", ".join(p.countries))
+    if p.min_value_eur or p.max_value_eur:
+        filt.append(f"value €{p.min_value_eur or 0:,.0f}–{('€' + format(p.max_value_eur, ',.0f')) if p.max_value_eur else 'any'} (unpublished values kept)")
+    if p.exclude_keywords:
+        filt.append("excluding " + ", ".join(p.exclude_keywords))
+    body = f"""<p><a href="../index.html">← all profiles</a></p><h1>{escape(p.name)}</h1>
+<p>{escape(p.description)}</p><p class="meta">Filters: {escape('; '.join(filt) or 'none')}. Preferred CPV: {', '.join(p.cpv) or 'none'}.
+<a href="{p.slug}.xml">RSS feed</a></p>
+<h2>Top {len(results)} open tenders</h2>{''.join(map(card, results)) or '<p>No open tenders match right now.</p>'}"""
+    return page(f"{p.name} – tender-radar", body,
+                f'<link rel="alternate" type="application/rss+xml" href="{p.slug}.xml">')
+
+
+INDEX_JS = """
+const $=s=>document.querySelector(s);let rows=[],sortKey='published',dir=-1;
+fetch('tenders.json').then(r=>r.json()).then(d=>{rows=d;
+ [...new Set(d.map(r=>r.country))].sort().forEach(c=>$('#f-country').add(new Option(c,c)));render();});
+function render(){const c=$('#f-country').value,cpv=$('#f-cpv').value.trim(),q=$('#f-q').value.toLowerCase(),
+ lo=+$('#f-min').value||0,hi=+$('#f-max').value||Infinity,dl=$('#f-dl').value,known=$('#f-known').checked;
+ const f=rows.filter(r=>(!c||r.country===c)&&(!cpv||r.cpv.split(' ').some(x=>x.startsWith(cpv)))
+  &&(!q||(r.title_en+' '+r.buyer).toLowerCase().includes(q))
+  &&(r.value_eur==null?!known:r.value_eur>=lo&&r.value_eur<=hi)&&(!dl||(r.deadline&&r.deadline>=dl)));
+ f.sort((a,b)=>((a[sortKey]??'')>(b[sortKey]??'')?1:(a[sortKey]??'')<(b[sortKey]??'')?-1:0)*dir);
+ $('#count').textContent=f.length+' of '+rows.length+' open tenders';
+ $('#tb').innerHTML=f.slice(0,300).map(r=>`<tr><td><a href="${r.link}">${esc(r.title_en)}</a><div class=meta>${esc(r.buyer||'')}</div></td>
+ <td>${r.country}</td><td class=num>${r.value_eur==null?'–':'€'+Math.round(r.value_eur).toLocaleString('en')}</td>
+ <td class=num>${r.deadline||'–'}</td><td class=num>${r.published}</td></tr>`).join('');}
+function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+document.querySelectorAll('.filters input,.filters select').forEach(e=>e.addEventListener('input',render));
+document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{dir=sortKey===th.dataset.k?-dir:1;sortKey=th.dataset.k;render();});
+"""
+
+
+def index_page(summaries) -> str:
+    profs = "".join(f"""<div class="card"><h3><a href="p/{p.slug}.html">{escape(p.name)}</a></h3>
+<div class="meta">{n} open tenders pass the filters · <a href="p/{p.slug}.xml">RSS</a></div><p class="meta">{escape(p.description)}</p></div>"""
+                    for p, n in summaries)
+    body = f"""<h1>tender-radar</h1>
+<p>Open EU public tenders in IT &amp; software services (CPV 72), ranked by fit for small businesses.
+Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-your-own-profile">Add your own profile</a>.</p>
+<h2>Example profiles</h2>{profs}
+<h2>Browse open tenders</h2><p class="meta" id="count">Loading…</p>
+<div class="filters">
+<label>Search<input id="f-q" type="search" placeholder="title or buyer"></label>
+<label>Country<select id="f-country"><option value="">All</option></select></label>
+<label>CPV starts with<input id="f-cpv" inputmode="numeric" size="8" placeholder="e.g. 7226"></label>
+<label>Min € <input id="f-min" type="number" min="0" step="10000" style="width:8em"></label>
+<label>Max € <input id="f-max" type="number" min="0" step="10000" style="width:8em"></label>
+<label>Deadline on/after<input id="f-dl" type="date"></label>
+<label>Value known only<input id="f-known" type="checkbox"></label></div>
+<div class="tablewrap"><table><thead><tr><th data-k="title_en">Tender</th><th data-k="country">Country</th>
+<th data-k="value_eur">Value</th><th data-k="deadline">Deadline</th><th data-k="published">Published ▾</th></tr></thead>
+<tbody id="tb"></tbody></table></div><p class="meta">Showing at most 300 rows; narrow with the filters.</p>
+<script>{INDEX_JS}</script>"""
+    return page("tender-radar – EU tenders for small businesses", body)
+
+
+def latest_versions(tenders: list[dict]) -> list[dict]:
+    """Buyers often re-publish the same call (corrections) under a new notice id.
+    Keep only the newest notice per (buyer, title)."""
+    best = {}
+    for t in tenders:
+        k = ((t["buyer"] or "").lower(), (t["title"] or "").lower())
+        if k not in best or (t["published"], t["id"]) > (best[k]["published"], best[k]["id"]):
+            best[k] = t
+    return list(best.values())
+
+
+def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfidf", doc_vecs=None) -> None:
+    today = dt.date.today()
+    open_ = latest_versions([t for t in tenders if not t["deadline"] or t["deadline"] >= today.isoformat()])
+    (out / "p").mkdir(parents=True, exist_ok=True)
+    summaries = []
+    for f in sorted(Path(profiles_dir).glob("*.yaml")):
+        p = match.Profile.load(f)
+        results = match.rank(open_, p, method=method, today=today, top=TOP_N, doc_vecs=doc_vecs)
+        (out / "p" / f"{p.slug}.html").write_text(profile_page(p, results), encoding="utf-8")
+        (out / "p" / f"{p.slug}.xml").write_text(rss(p, results), encoding="utf-8")
+        n = sum(match.passes_filters(t, p, today) for t in open_)
+        summaries.append((p, n))
+    keep = ("id", "title_en", "buyer", "country", "cpv", "value_eur", "deadline", "published", "link")
+    (out / "tenders.json").write_text(json.dumps([{k: t[k] for k in keep} for t in open_], ensure_ascii=False,
+                                                 separators=(",", ":")), encoding="utf-8")
+    (out / "index.html").write_text(index_page(summaries), encoding="utf-8")
+    (out / ".nojekyll").write_text("")
