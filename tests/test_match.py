@@ -64,3 +64,14 @@ def test_build_writes_pages(tmp_path):
     assert "data analytics &lt;b&gt;" in html and "European Union" in html
     assert "<rss" in (tmp_path / "site" / "p" / "x.xml").read_text(encoding="utf-8")
     assert "European Union" in (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
+
+
+def test_feedback_links(tmp_path):
+    from urllib.parse import parse_qs, urlparse
+    r = dict(t("753867-2026", "IT <x>"), score=0.4, reasons=["r"])
+    u = urlparse(build.feedback_url(r, "data-analytics-dach", "not relevant"))
+    q = parse_qs(u.query)
+    assert u.path.endswith("/issues/new")
+    assert q["body"][0].startswith("feedback: not relevant | profile: data-analytics-dach | tender: 753867-2026")
+    html = build.card(r, "data-analytics-dach")
+    assert "issues/new?" in html and "&amp;body=" in html  # escaped inside the attribute

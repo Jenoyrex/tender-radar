@@ -6,6 +6,7 @@ import json
 from email.utils import format_datetime
 from html import escape
 from pathlib import Path
+from urllib.parse import urlencode
 from xml.sax.saxutils import escape as xesc
 
 from . import match
@@ -26,6 +27,7 @@ h1{font-size:1.6rem;margin:.2em 0}h2{font-size:1.15rem;margin:2em 0 .5em}.muted{
 .meta{font-size:.875rem;color:var(--muted)}.meta b{color:var(--fg);font-weight:600}
 .chips{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
 .chips li{background:var(--chip);border-radius:4px;padding:1px 7px;font-size:.8rem}
+.fb{font-size:.8rem;color:var(--muted);margin-top:6px}.fb a{color:var(--muted)}
 .score{float:right;font-variant-numeric:tabular-nums;font-weight:600;margin-left:8px}
 footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
@@ -51,12 +53,26 @@ def money(t) -> str:
     return s if t["currency"] == "EUR" or t["value_eur"] is None else f"{s} (≈ €{t['value_eur']:,.0f})"
 
 
-def card(t) -> str:
+REPO = "https://github.com/Jenoyrex/tender-radar"
+
+
+def feedback_url(t, slug: str, verdict: str) -> str:
+    """Prefilled GitHub issue. The first body line is machine-readable for later use as labels."""
+    body = (f"feedback: {verdict} | profile: {slug} | tender: {t['id']} | score: {t['score']:.3f}\n\n"
+            f"Tender: {t['title_en'] or t['title']}\n{t['link']}\n\n"
+            "Optional: why? (Please don't include personal data; issues are public.)\n")
+    q = urlencode({"title": f"[feedback] {verdict}: {slug} / {t['id']}", "body": body, "labels": "feedback"})
+    return f"{REPO}/issues/new?{q}"
+
+
+def card(t, slug: str = "") -> str:
     chips = "".join(f"<li>{escape(r)}</li>" for r in t["reasons"])
+    fb = (f'<div class="fb">Useful match? <a href="{escape(feedback_url(t, slug, "relevant"))}" rel="nofollow">👍 relevant</a>'
+          f' · <a href="{escape(feedback_url(t, slug, "not relevant"))}" rel="nofollow">👎 not relevant</a></div>') if slug else ""
     return f"""<div class="card"><span class="score" title="match score">{t['score']:.2f}</span>
 <h3><a href="{t['link']}">{escape(t['title_en'] or t['title'])}</a></h3>
 <div class="meta"><b>{escape(t['buyer'] or '?')}</b> · {t['country']} · value {money(t)} ·
-deadline <b>{t['deadline'] or 'see notice'}</b> · published {t['published']}</div><ul class="chips">{chips}</ul></div>"""
+deadline <b>{t['deadline'] or 'see notice'}</b> · published {t['published']}</div><ul class="chips">{chips}</ul>{fb}</div>"""
 
 
 def rss(p: match.Profile, results: list[dict]) -> str:
@@ -82,7 +98,8 @@ def profile_page(p: match.Profile, results: list[dict]) -> str:
     body = f"""<p><a href="../index.html">← all profiles</a></p><h1>{escape(p.name)}</h1>
 <p>{escape(p.description)}</p><p class="meta">Filters: {escape('; '.join(filt) or 'none')}. Preferred CPV: {', '.join(p.cpv) or 'none'}.
 <a href="{p.slug}.xml">RSS feed</a></p>
-<h2>Top {len(results)} open tenders</h2>{''.join(map(card, results)) or '<p>No open tenders match right now.</p>'}"""
+<p class="meta">The 👍/👎 links open a public GitHub issue (needs a free GitHub account). Feedback becomes labels for the next evaluation round.</p>
+<h2>Top {len(results)} open tenders</h2>{''.join(card(t, p.slug) for t in results) or '<p>No open tenders match right now.</p>'}"""
     return page(f"{p.name} – tender-radar", body,
                 f'<link rel="alternate" type="application/rss+xml" href="{p.slug}.xml">')
 
