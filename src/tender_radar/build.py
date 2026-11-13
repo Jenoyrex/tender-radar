@@ -142,7 +142,7 @@ def latest_versions(tenders: list[dict]) -> list[dict]:
     return list(best.values())
 
 
-def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfidf", doc_vecs=None) -> None:
+def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfidf", doc_vecs=None) -> list[dict]:
     today = dt.date.today()
     open_ = latest_versions([t for t in tenders if not t["deadline"] or t["deadline"] >= today.isoformat()])
     (out / "p").mkdir(parents=True, exist_ok=True)
@@ -159,3 +159,4 @@ def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfi
                                                  separators=(",", ":")), encoding="utf-8")
     (out / "index.html").write_text(index_page(summaries), encoding="utf-8")
     (out / ".nojekyll").write_text("")
+    return open_

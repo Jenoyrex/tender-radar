@@ -1,0 +1,51 @@
+name: daily
+on:
+  schedule:
+    - cron: "23 5 * * *"   # 05:23 UTC, after TED's morning publication
+  workflow_dispatch:
+permissions:
+  contents: write   # commit data/open-tenders.csv
+  pages: write
+  id-token: write
+concurrency: {group: daily, cancel-in-progress: false}
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      # SQLite DB, raw TED responses and embedding cache. If the cache is ever
+      # evicted, `update` simply backfills 60 days again (~2 minutes).
+      - uses: actions/cache@v4
+        with:
+          path: |
+            data/tenders.sqlite
+            data/raw
+            data/emb-*.npz
+            ~/.cache/huggingface
+          key: data-${{ github.run_id }}
+          restore-keys: data-
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[embeddings]"
+      - name: Fetch new notices from TED
+        id: update
+        continue-on-error: true   # still rebuild the site from what we have; fail at the end
+        run: tender-radar update
+      - run: tender-radar build
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: site}
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Commit dataset snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/open-tenders.csv
+          git diff --cached --quiet || git commit -m "Daily data update $(date -u +%F)"
+          git push
+      - name: Fail the run if fetching failed (triggers GitHub's failure email)
+        if: steps.update.outcome == 'failure'
+        run: exit 1

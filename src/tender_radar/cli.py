@@ -1,4 +1,5 @@
 import argparse
+import csv
 import datetime as dt
 import logging
 import sys
@@ -38,7 +39,13 @@ def cmd_build(cfg, args):
     vecs = None
     if method == "embeddings":
         vecs = match.cached_embeddings(tenders, Path(cfg["db_path"]).parent / f"emb-{match.EMBED_MODEL}.npz")
-    build.build(tenders, ROOT / "profiles", Path(cfg["site_dir"]), method=method, doc_vecs=vecs)
+    open_ = build.build(tenders, ROOT / "profiles", Path(cfg["site_dir"]), method=method, doc_vecs=vecs)
+    # Small, diff-friendly text snapshot that the daily workflow commits (the SQLite DB is not committed).
+    cols = ["id", "published", "deadline", "country", "buyer", "cpv", "value", "currency", "value_eur", "title_en"]
+    with open(ROOT / "data" / "open-tenders.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, cols, extrasaction="ignore", lineterminator="\n")
+        w.writeheader()
+        w.writerows(sorted(open_, key=lambda t: t["id"]))
     log.info("built site in %s with %s matcher (%d tenders)", cfg["site_dir"], method, len(tenders))
     return 0
 
