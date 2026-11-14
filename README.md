@@ -160,7 +160,7 @@ the profile's countries come from the company's own wins), only the one tender t
 company actually won counts as a hit, and companies with many wins skew large.
 Method, all tables, a breakdown by company size, and the earlier label and CPV-proxy
 rounds are in [docs/evaluation.md](docs/evaluation.md); how winners were matched
-across notices is in [docs/entity-sample.md](docs/entity-sample.md).
+across notices is in [docs/entity-sample.md](docs/entity-sample.md). The story behind it, including what did not work: [docs/WRITEUP.md](docs/WRITEUP.md).
 
 ## Limitations
 
