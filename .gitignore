@@ -230,3 +230,4 @@ site/
 data/history.sqlite
 data/emb-e5-history.npz
 data/backtest-results.json
+data/tenders.sqlite

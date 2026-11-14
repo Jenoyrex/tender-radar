@@ -41,7 +41,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A profiles
           git commit -m "Self-serve profiles: $(jq -r '[.[] | select(.action == "created" or .action == "removed") | "\(.action) \(.slug) (#\(.number))"] | join(", ")' result.json)"
-          for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done
+          for i in 1 2 3; do git pull --rebase --autostash && git push && break; sleep 10; done
       - uses: actions/upload-artifact@v5
         if: steps.run.outputs.any == 'true'
         with: {name: result, path: result.json}

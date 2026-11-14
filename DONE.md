@@ -16,7 +16,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
   Check: CI printed in evaluation.md; `config.yaml` / `match.py` agree with the decision.
 - [ ] **A5** docs/evaluation.md: backtest is the main section, label results secondary, limitations listed.
   Check: read the file top to bottom.
-- [ ] **A6** award-backtest merged into main after tests + CI pass.
+- [x] **A6** award-backtest merged into main after tests + CI pass.
   Check: `gh run list --branch award-backtest` green; `git log main` contains the merge.
 
 ## B. Product
