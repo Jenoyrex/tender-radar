@@ -89,8 +89,10 @@ rejects a sign-up, with a polite explanation, when:
 
 Requests are processed one at a time (one GitHub concurrency group), and every
 run handles **all** open requests oldest first, so two sign-ups can never race
-each other's commits and none is lost if GitHub drops a queued run. A run every
-6 hours picks up anything missed. The limits live in
+each other's commits and none is lost if GitHub drops a queued run: the next
+sign-up, or a scheduled sweep every 6 hours, picks it up. The scheduled sweep is
+best effort; on 2026-11-14 GitHub delayed this repo's scheduled runs by several
+hours and the first 6-hourly sweep did not fire at all. The limits live in
 [`signup.py`](src/tender_radar/signup.py).
 
 ## Add a profile by pull request
