@@ -62,6 +62,56 @@ def cmd_evaluate(cfg, args):
     return 0
 
 
+def _load_days(raw_dir, start, end, kind):
+    out, day = [], start
+    while day <= end:
+        if ted.raw_path(raw_dir, day, kind).exists():
+            out += ted.load_raw(raw_dir, day, kind)
+        day += dt.timedelta(days=1)
+    return out
+
+
+def cmd_history(cfg, args):
+    """Backfill award + competition notices for the backtest into history_db, then resolve winners."""
+    from . import awards
+    end = dt.date.today()
+    a_start = end - dt.timedelta(days=cfg["history_days"])
+    c_start = a_start - dt.timedelta(days=cfg["history_lead_days"])
+    raw_dir = Path(cfg["raw_dir"])
+    failed = []
+    if not args.no_fetch:
+        failed += ted.collect(a_start, end, cfg, kind="result")[1]
+        failed += ted.collect(c_start, end, cfg, kind="competition")[1]
+    con = db.connect(cfg["history_db"])
+    db.upsert(con, clean.clean_all(_load_days(raw_dir, c_start, end, "competition")))
+    raw_awards = _load_days(raw_dir, a_start, end, "result")
+    wins = [w for n in raw_awards for w in awards.clean_award(n)]
+    awards.store(con, wins)
+    print(awards.report(con, len(raw_awards)))
+    if failed:
+        log.error("failed days: %s", ", ".join(map(str, sorted(failed))))
+        return 1
+    return 0
+
+
+def cmd_profile_from_company(cfg, args):
+    from . import company
+    try:
+        prof = company.make_profile(args.name, company.own_wins(args.name, company.search(args.name, cfg)))
+    except ValueError as e:
+        log.error("%s", e)
+        return 1
+    text = company.to_yaml(prof)
+    if args.write:
+        path = ROOT / "profiles" / f"{company.slugify(args.name)}.yaml"
+        path.write_text(text, encoding="utf-8")
+        log.info("wrote %s", path)
+    else:
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(text)
+    return 0
+
+
 def cmd_label(cfg, args):
     from . import label
     data = Path(cfg["db_path"]).parent
@@ -97,11 +147,18 @@ def main(argv=None):
     lb = sub.add_parser("label", help="hand-label (profile, tender) pairs into data/labels.csv")
     lb.add_argument("--make-queue", action="store_true", help="sample a new frozen queue of pairs")
     lb.add_argument("--force", action="store_true")
+    h = sub.add_parser("history", help="backfill award notices for the backtest and resolve winners")
+    h.add_argument("--no-fetch", action="store_true", help="only rebuild from the raw cache")
+    pc = sub.add_parser("profile-from-company", help="build a profile YAML from a company's past TED wins")
+    pc.add_argument("name")
+    pc.add_argument("--write", action="store_true", help="save to profiles/<slug>.yaml instead of printing")
     args = p.parse_args(argv)
     cfg = load_config()
-    for k in ("db_path", "raw_dir", "site_dir"):
+    for k in ("db_path", "raw_dir", "site_dir", "history_db"):
         cfg[k] = ROOT / cfg[k]
-    sys.exit({"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label}[args.cmd](cfg, args))
+    cmds = {"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label,
+            "history": cmd_history, "profile-from-company": cmd_profile_from_company}
+    sys.exit(cmds[args.cmd](cfg, args))
 
 
 if __name__ == "__main__":
