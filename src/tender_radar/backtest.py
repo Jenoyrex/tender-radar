@@ -88,6 +88,15 @@ def pool(tenders: list[dict], d: str, p: match.Profile) -> list[dict]:
     return [t for t in build.latest_versions(open_) if match.passes_filters(t, p, day)]
 
 
+def pool_members(tenders: list[dict], wins: list[dict], min_wins: int = MIN_WINS) -> list[dict]:
+    """Every notice that appears in some case's pool: the only ones the e5 matcher needs embedded."""
+    cases, _ = make_cases(tenders, wins, min_wins)
+    ids = set()
+    for c in cases:
+        ids |= {t["id"] for t in pool(tenders, c.date, case_profile(c))}
+    return [t for t in tenders if t["id"] in ids]
+
+
 def z(x: np.ndarray) -> np.ndarray:
     return (x - x.mean()) / (x.std() or 1)
 

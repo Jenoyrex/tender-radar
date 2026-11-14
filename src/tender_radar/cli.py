@@ -107,7 +107,7 @@ def cmd_backtest(cfg, args):
     vecs = query = None
     if not args.no_e5:
         vecs = match.cached_embeddings(
-            tenders,
+            backtest.pool_members(tenders, wins, args.min_wins),
             Path(cfg["history_db"]).parent / "emb-e5-history.npz",
             match.E5_MODEL,
             text_fn=match.e5_text,
