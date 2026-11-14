@@ -10,6 +10,8 @@ permissions:
   id-token: write
   issues: read      # tender-radar feedback
 concurrency: {group: daily, cancel-in-progress: false}
+env:
+  PYTHONUTF8: "1"   # UTF-8 for all text I/O, whatever the runner locale
 jobs:
   update:
     runs-on: ubuntu-latest

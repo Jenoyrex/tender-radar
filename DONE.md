@@ -40,5 +40,14 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [ ] **C6** docs/WRITEUP.md, 600–900 words, honest. Check: word count; read it.
 - [ ] **C7** v1.0.0 release with notes. Check: `gh release view v1.0.0`.
 
+## D. Robustness (added 2026-11-14)
+- [ ] **D1** Non-destructive schema changes: `db.connect` never drops a table with data (ALTER TABLE ADD COLUMN);
+  same for history.sqlite. Check: `pytest tests/test_db.py` opens an old-schema DB with rows, rows survive.
+- [x] **D2** UTF-8 everywhere: explicit `encoding="utf-8"` on all text I/O, `PYTHONUTF8=1` in workflows, a ruff rule
+  catching missing encodings, atomic writes (temp file + rename). Check: `ruff check` with the rule enabled;
+  `pytest tests/test_util.py` (failed write leaves the original intact); grep of workflows.
+- [ ] **D3** Sign-up abuse limits: 1 active profile per GitHub user, ≤20 new sign-ups/day, hard cap 200, issue author
+  account ≥7 days old, concurrency group (no racing commits). Check: `pytest tests/test_signup.py -k limit`; README section.
+
 ## Blocked
 (none yet)

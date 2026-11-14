@@ -1,5 +1,7 @@
 name: tests
 on: [push, pull_request]
+env:
+  PYTHONUTF8: "1"   # UTF-8 for all text I/O, whatever the runner locale
 jobs:
   pytest:
     runs-on: ubuntu-latest

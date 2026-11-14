@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import build, match
+from . import build, match, util
 
 PER_PROFILE = 50
 QUEUE_COLS = ["profile", "tender_id", "source"]
@@ -67,7 +67,7 @@ def make_queue(tenders: list[dict], profiles_dir: Path, data_dir: Path, today: d
 
 
 def save_snapshot(path: Path, today: dt.date, tenders: list[dict]) -> None:
-    with gzip.open(path, "wt", encoding="utf-8") as f:
+    with util.atomic_path(path) as tmp, gzip.open(tmp, "wt", encoding="utf-8") as f:
         json.dump({"date": today.isoformat(), "tenders": tenders}, f, ensure_ascii=False)
 
 

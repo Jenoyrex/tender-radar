@@ -83,7 +83,7 @@ def test_latest_versions_keeps_newest_duplicate():
 
 def test_build_writes_pages(tmp_path):
     (tmp_path / "prof").mkdir()
-    (tmp_path / "prof" / "x.yaml").write_text("name: X\ndescription: data analytics\ncpv: ['7231']\n")
+    (tmp_path / "prof" / "x.yaml").write_text("name: X\ndescription: data analytics\ncpv: ['7231']\n", encoding="utf-8")
     ts = [t("1", "data analytics <b>", deadline="2099-01-01"), t("2", "data platform", deadline="2099-01-01")]
     build.build(ts, tmp_path / "prof", tmp_path / "site")
     html = (tmp_path / "site" / "p" / "x.html").read_text(encoding="utf-8")

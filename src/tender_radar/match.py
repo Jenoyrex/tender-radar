@@ -14,6 +14,8 @@ import numpy as np
 import yaml
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from . import util
+
 CPV_BOOST = 0.1
 EMBED_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 WORD = re.compile(r"[^\W\d_]{4,}", re.UNICODE)
@@ -104,7 +106,8 @@ def cached_embeddings(
     if missing:
         cache |= dict(zip((t["id"] for t in missing), embed([text_fn(t) for t in missing], model_name, prefix), strict=True))
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(path, **cache)  # ponytail: never pruned; ~1.5 KB per notice
+        with util.atomic_path(path) as tmp, open(tmp, "wb") as f:
+            np.savez(f, **cache)  # ponytail: never pruned; ~1.5 KB per notice
     return cache
 
 

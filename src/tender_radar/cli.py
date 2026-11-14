@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-from . import build, clean, db, match, ted
+from . import build, clean, db, match, ted, util
 from .config import ROOT
 from .config import load as load_config
 
@@ -43,7 +43,7 @@ def cmd_build(cfg, args):
     open_ = build.build(tenders, ROOT / "profiles", Path(cfg["site_dir"]), method=method, doc_vecs=vecs)
     # Small, diff-friendly text snapshot that the daily workflow commits (the SQLite DB is not committed).
     cols = ["id", "published", "deadline", "country", "buyer", "cpv", "value", "currency", "value_eur", "title_en"]
-    with open(ROOT / "data" / "open-tenders.csv", "w", newline="", encoding="utf-8") as f:
+    with util.atomic_path(ROOT / "data" / "open-tenders.csv") as tmp, open(tmp, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, cols, extrasaction="ignore", lineterminator="\n")
         w.writeheader()
         w.writerows(sorted(open_, key=lambda t: t["id"]))
@@ -116,7 +116,7 @@ def cmd_backtest(cfg, args):
         query = lambda q: match.embed([q], match.E5_MODEL, prefix="query: ")[0]  # noqa: E731
     results, funnel = backtest.run(tenders, wins, vecs, query, min_wins=args.min_wins)
     out = Path(cfg["history_db"]).parent / "backtest-results.json"
-    out.write_text(json.dumps({"funnel": funnel, "results": results}, default=str), encoding="utf-8")
+    util.write_text(out, json.dumps({"funnel": funnel, "results": results}, default=str))
     shipped = backtest.CURRENT  # the matcher config.yaml ships; update both together (docs/evaluation.md)
     test = [r for r in results if r["part"] == "test"]
     m, rnd = backtest.metrics(test, shipped), backtest.metrics(test, "random")
@@ -129,7 +129,7 @@ def cmd_backtest(cfg, args):
         "matcher": shipped,
         "date": dt.date.today().isoformat(),
     }
-    (ROOT / "data" / "backtest-summary.json").write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
+    util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(summary, indent=1) + "\n")
     sys.stdout.reconfigure(encoding="utf-8")
     print(backtest.to_markdown(results, funnel))
     return 0
@@ -146,7 +146,7 @@ def cmd_profile_from_company(cfg, args):
     text = company.to_yaml(prof)
     if args.write:
         path = ROOT / "profiles" / f"{company.slugify(args.name)}.yaml"
-        path.write_text(text, encoding="utf-8")
+        util.write_text(path, text)
         log.info("wrote %s", path)
     else:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -185,7 +185,7 @@ def cmd_issue(cfg, args):
     try:
         if signup.SIGNUP_LABEL in labels:
             slug, prof = signup.profile_from_issue(issue, profiles, cfg)
-            (profiles / f"{slug}.yaml").write_text(company.to_yaml(prof), encoding="utf-8")
+            util.write_text(profiles / f"{slug}.yaml", company.to_yaml(prof))
             res = {"action": "created", "comment": signup.signup_reply(slug, prof), "slug": slug}
         elif signup.REMOVE_LABEL in labels:
             path = signup.removal_target(issue, profiles)
@@ -205,7 +205,7 @@ def cmd_issue(cfg, args):
             "comment": f"Sorry, I couldn't process this request: {e}\n\nYou're welcome to open a new issue with the form.",
             "slug": "",
         }
-    Path(args.out).write_text(json.dumps(res), encoding="utf-8")
+    util.write_text(args.out, json.dumps(res))
     log.info("issue #%s: %s %s", issue.get("number"), res["action"], res["slug"])
     return 0
 
@@ -221,7 +221,7 @@ def cmd_label(cfg, args):
             return 1
         today = dt.date.today()
         queue, open_ = label.make_queue(db.load(db.connect(cfg["db_path"])), ROOT / "profiles", data, today)
-        with open(queue_path, "w", newline="", encoding="utf-8") as f:
+        with util.atomic_path(queue_path) as tmp, open(tmp, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, label.QUEUE_COLS, lineterminator="\n")
             w.writeheader()
             w.writerows(queue)

@@ -10,7 +10,7 @@ TODAY = dt.date(2026, 11, 13)
 
 
 def test_queue_pools_models_and_samples_random(tmp_path, monkeypatch):
-    (tmp_path / "x.yaml").write_text("name: X\ndescription: data\n")
+    (tmp_path / "x.yaml").write_text("name: X\ndescription: data\n", encoding="utf-8")
     tenders = [t(str(i), f"tender {i}", buyer=f"b{i}") for i in range(200)]
     # three fake models with different rankings
     monkeypatch.setattr(
@@ -31,10 +31,10 @@ def test_queue_pools_models_and_samples_random(tmp_path, monkeypatch):
 
 
 def test_run_records_labels_and_resumes(tmp_path, monkeypatch):
-    (tmp_path / "x.yaml").write_text("name: X\ndescription: data\n")
+    (tmp_path / "x.yaml").write_text("name: X\ndescription: data\n", encoding="utf-8")
     ts = [t("1", "a"), t("2", "b"), t("3", "c")]
     q = tmp_path / "q.csv"
-    q.write_text("profile,tender_id,source\nx,1,pool\nx,2,random\nx,3,random\n")
+    q.write_text("profile,tender_id,source\nx,1,pool\nx,2,random\nx,3,random\n", encoding="utf-8")
     out = tmp_path / "labels.csv"
     answers = iter(["?", "r", "s", "q"])  # invalid key re-prompts, skip, quit
     monkeypatch.setattr("builtins.input", lambda _: next(answers))

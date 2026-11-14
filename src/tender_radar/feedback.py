@@ -14,6 +14,8 @@ import re
 import urllib.request
 from pathlib import Path
 
+from . import util
+
 COLUMNS = ["issue", "created", "verdict", "profile", "tender", "score"]
 LINE = re.compile(
     r"feedback:\s*(relevant|not relevant)\s*\|\s*profile:\s*([\w-]+)\s*\|\s*tender:\s*(\d+-\d{4})"
@@ -62,7 +64,7 @@ def fetch_all(get=github_get) -> list[dict]:
 
 
 def write(rows: list[dict], path: Path) -> None:
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with util.atomic_path(path) as tmp, open(tmp, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, COLUMNS, lineterminator="\n")
         w.writeheader()
         w.writerows(sorted(rows, key=lambda r: r["issue"]))

@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from xml.sax.saxutils import escape as xesc
 
-from . import match
+from . import match, util
 
 SITE_URL = "https://jenoyrex.github.io/tender-radar"
 ATTRIBUTION = (
@@ -227,16 +227,16 @@ def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfi
     for f in sorted(Path(profiles_dir).glob("*.yaml")):
         p = match.Profile.load(f)
         results = match.rank(open_, p, method=method, today=today, top=TOP_N, doc_vecs=doc_vecs)
-        (out / "p" / f"{p.slug}.html").write_text(profile_page(p, results), encoding="utf-8")
-        (out / "p" / f"{p.slug}.xml").write_text(rss(p, results), encoding="utf-8")
+        util.write_text(out / "p" / f"{p.slug}.html", profile_page(p, results))
+        util.write_text(out / "p" / f"{p.slug}.xml", rss(p, results))
         n = sum(match.passes_filters(t, p, today) for t in open_)
         summaries.append((p, n))
     keep = ("id", "title_en", "buyer", "country", "cpv", "value_eur", "deadline", "published", "link")
     # Newest first, matching the JS default sort, so server-rendered rows are what JS shows too.
     rows = sorted(({k: t[k] for k in keep} for t in open_), key=lambda r: r["published"], reverse=True)
-    (out / "tenders.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    util.write_text(out / "tenders.json", json.dumps(rows, ensure_ascii=False, separators=(",", ":")))
     summary = Path(profiles_dir).parent / "data" / "backtest-summary.json"
     headline = json.loads(summary.read_text(encoding="utf-8")) if summary.exists() else None
-    (out / "index.html").write_text(index_page(summaries, rows, headline), encoding="utf-8")
-    (out / ".nojekyll").write_text("")
+    util.write_text(out / "index.html", index_page(summaries, rows, headline))
+    util.write_text(out / ".nojekyll", "")
     return open_

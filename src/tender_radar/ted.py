@@ -11,6 +11,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from . import util
+
 URL = "https://api.ted.europa.eu/v3/notices/search"
 PAGE_SIZE = 250  # API maximum
 FIELDS = [
@@ -149,7 +151,7 @@ def collect(
         if not p.exists() or (end - day).days < refresh_days:
             try:
                 notices = fetch_day(day, cfg, kind)
-                with gzip.open(p, "wt", encoding="utf-8") as f:
+                with util.atomic_path(p) as tmp, gzip.open(tmp, "wt", encoding="utf-8") as f:
                     json.dump(notices, f, ensure_ascii=False)
                 log.info("%s %s: %d notices", kind, day, len(notices))
                 fetched.append(day)

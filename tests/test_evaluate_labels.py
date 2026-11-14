@@ -20,6 +20,8 @@ def test_split_is_stratified_and_deterministic():
 
 
 def test_human_labels_override(tmp_path):
-    (tmp_path / "labels-claude.csv").write_text("profile,tender_id,label,labelled_at\np,1,not_relevant,x\np,2,unsure,x\n")
-    (tmp_path / "labels.csv").write_text("profile,tender_id,label,labelled_at\np,1,relevant,x\n")
+    (tmp_path / "labels-claude.csv").write_text(
+        "profile,tender_id,label,labelled_at\np,1,not_relevant,x\np,2,unsure,x\n", encoding="utf-8"
+    )
+    (tmp_path / "labels.csv").write_text("profile,tender_id,label,labelled_at\np,1,relevant,x\n", encoding="utf-8")
     assert E.read_labels(tmp_path) == {("p", "1"): "relevant", ("p", "2"): "unsure"}

@@ -128,7 +128,7 @@ def test_issue_command_end_to_end(tmp_path, monkeypatch):
     ev, out = tmp_path / "event.json", tmp_path / "result.json"
     ev.write_text(json.dumps({"issue": issue(form(desc=DESC))}), encoding="utf-8")
     cli.cmd_issue({"cpv_prefixes": ["72"], "user_agent": "t"}, types.SimpleNamespace(event=ev, out=out))
-    res = json.loads(out.read_text())
+    res = json.loads(out.read_text(encoding="utf-8"))
     assert res["action"] == "created" and (tmp_path / "profiles" / f"{res['slug']}.yaml").exists()
     assert f"/p/{res['slug']}.html" in res["comment"]
     # removal by a stranger is refused and keeps the file
@@ -144,7 +144,7 @@ def test_issue_command_end_to_end(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     cli.cmd_issue({}, types.SimpleNamespace(event=ev, out=out))
-    assert json.loads(out.read_text())["action"] == "rejected"
+    assert json.loads(out.read_text(encoding="utf-8"))["action"] == "rejected"
     assert (tmp_path / "profiles" / f"{res['slug']}.yaml").exists()
     ev.write_text(
         json.dumps(
@@ -153,5 +153,5 @@ def test_issue_command_end_to_end(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     cli.cmd_issue({}, types.SimpleNamespace(event=ev, out=out))
-    assert json.loads(out.read_text())["action"] == "removed"
+    assert json.loads(out.read_text(encoding="utf-8"))["action"] == "removed"
     assert not (tmp_path / "profiles" / f"{res['slug']}.yaml").exists()

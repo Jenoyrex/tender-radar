@@ -15,10 +15,14 @@ def serve(root):
 
 def test_finds_broken_internal_link_and_bad_feed(tmp_path):
     (tmp_path / "p").mkdir()
-    (tmp_path / "index.html").write_text('<a href="p/a.html">a</a> <a href="p/missing.html">x</a> <a href="#top">t</a>')
-    (tmp_path / "p" / "a.html").write_text('<a href="../index.html">home</a> <a href="a.xml">rss</a> <a href="b.xml">rss</a>')
-    (tmp_path / "p" / "a.xml").write_text("<rss><channel></channel></rss>")
-    (tmp_path / "p" / "b.xml").write_text("<rss><channel>")  # truncated feed
+    (tmp_path / "index.html").write_text(
+        '<a href="p/a.html">a</a> <a href="p/missing.html">x</a> <a href="#top">t</a>', encoding="utf-8"
+    )
+    (tmp_path / "p" / "a.html").write_text(
+        '<a href="../index.html">home</a> <a href="a.xml">rss</a> <a href="b.xml">rss</a>', encoding="utf-8"
+    )
+    (tmp_path / "p" / "a.xml").write_text("<rss><channel></channel></rss>", encoding="utf-8")
+    (tmp_path / "p" / "b.xml").write_text("<rss><channel>", encoding="utf-8")  # truncated feed
     srv, url = serve(tmp_path)
     try:
         errors = linkcheck.check(url)
@@ -30,7 +34,7 @@ def test_finds_broken_internal_link_and_bad_feed(tmp_path):
 
 
 def test_clean_site_passes(tmp_path):
-    (tmp_path / "index.html").write_text('<a href="index.html">self</a>')
+    (tmp_path / "index.html").write_text('<a href="index.html">self</a>', encoding="utf-8")
     srv, url = serve(tmp_path)
     try:
         assert linkcheck.check(url) == []

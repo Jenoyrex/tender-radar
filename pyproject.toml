@@ -36,3 +36,8 @@ select = ["E", "F", "W", "I", "B", "UP"]
 # E501: the formatter wraps code; what is left are HTML/CSS template strings.
 # E731: small named lambdas are used deliberately for one-line helpers.
 ignore = ["E501", "E731"]
+# PLW1514: text I/O without encoding= (preview rule, opted into explicitly). It only sees
+# calls on objects it can tell are Paths; tests/test_util.py checks every call site by AST.
+preview = true
+explicit-preview-rules = true
+extend-select = ["PLW1514"]
