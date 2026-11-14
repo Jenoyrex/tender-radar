@@ -229,7 +229,7 @@ by a wide margin, so no widening to other CPV codes or to 3+ wins was needed.
 Both earlier rounds measured the matcher against weaker ground truth. They reached
 the same decision (keep character TF-IDF) and are kept in short form. The full
 version with all tables is in git history
-([docs/evaluation.md at 15a4582](https://github.com/Jenoyrex/tender-radar/blob/15a4582/docs/evaluation.md)).
+([docs/evaluation.md at 7942573](https://github.com/Jenoyrex/tender-radar/blob/7942573/docs/evaluation.md)).
 
 ### Round 2 (2026-11-13): 150 labelled (profile, tender) pairs
 
