@@ -3,6 +3,7 @@
 import datetime as dt
 import gzip
 import hashlib
+import http.client
 import json
 import logging
 import time
@@ -96,7 +97,7 @@ def _post(body: dict, user_agent: str, retries: int = 4) -> dict:
             if e.code < 500 and e.code != 429:  # our fault: retrying won't help
                 raise TedError(f"HTTP {e.code}: {msg}") from e
             err = f"HTTP {e.code}"
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException, json.JSONDecodeError) as e:
             err = repr(e)
         wait = 5 * 2**attempt
         log.warning("TED request failed (%s), retry in %ss", err, wait)
