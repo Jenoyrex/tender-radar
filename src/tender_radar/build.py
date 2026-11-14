@@ -31,6 +31,8 @@ h1{font-size:1.6rem;margin:.2em 0}h2{font-size:1.15rem;margin:2em 0 .5em}.muted{
 .chips li{background:var(--chip);border-radius:4px;padding:1px 7px;font-size:.8rem}
 .fb{font-size:.8rem;color:var(--muted);margin-top:6px}.fb a{color:var(--muted)}
 .score{float:right;font-variant-numeric:tabular-nums;font-weight:600;margin-left:8px}
+.lead{font-size:1.15rem}.steps{padding-left:1.3em}.steps li{margin:.4em 0}
+.btn{display:inline-block;background:var(--accent);color:var(--bg);padding:9px 16px;border-radius:6px;text-decoration:none;font-weight:600}
 footer{margin-top:40px;padding-top:12px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
 .filters label{display:flex;flex-direction:column;font-size:.75rem;color:var(--muted);gap:2px}
@@ -146,16 +148,50 @@ def row(r) -> str:
     )
 
 
-def index_page(summaries, rows=()) -> str:
+SIGNUP_URL = f"{REPO}/issues/new?template=signup.yml"
+
+
+def headline_html(h: dict | None) -> str:
+    """One honest sentence from data/backtest-summary.json (written by `tender-radar backtest`)."""
+    if not h:
+        return "<p>How well the ranking works is being measured; see the evaluation.</p>"
+    return (
+        f"<p>We replayed history for <b>{h['companies']}</b> companies that won EU IT contracts: for each, we built a profile from "
+        f"its earlier wins and ranked the tenders that were open when its next win was published. That tender was in the "
+        f"top 10 for <b>{100 * h['hit10']:.0f}%</b> of companies (random order: {100 * h['hit10_random']:.0f}%) and in the top 50 "
+        f"for {100 * h['hit50']:.0f}%. Useful as a shortlist, not a guarantee.</p>"
+    )
+
+
+def index_page(summaries, rows=(), headline: dict | None = None) -> str:
+    examples = [(p, n) for p, n in summaries if not p.signup_issue]
+    n_self = len(summaries) - len(examples)
     profs = "".join(
         f"""<div class="card"><h3><a href="p/{p.slug}.html">{escape(p.name)}</a></h3>
 <div class="meta">{n} open tenders pass the filters · <a href="p/{p.slug}.xml">RSS</a></div><p class="meta">{escape(p.description)}</p></div>"""
-        for p, n in summaries
+        for p, n in examples
     )
     body = f"""<h1>tender-radar</h1>
-<p>Open EU public tenders in IT &amp; software services (CPV 72), ranked by fit for small businesses.
-Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-your-own-profile">Add your own profile</a>.</p>
+<p class="lead">A free daily shortlist of open EU public tenders for IT and software services, ranked for your business,
+as a web page and an RSS feed.</p>
+<p><b>For</b> small IT companies (web studios, data and BI consultancies, managed IT and support providers, software houses)
+that want to bid on public contracts across Europe without reading thousands of notices.</p>
+<h2>How it works</h2>
+<ol class="steps">
+<li>You describe your business in a few sentences, or give your company name and we use its past EU contract wins.</li>
+<li>Every morning we fetch new calls for tender from <a href="https://ted.europa.eu">TED</a>, the EU's official procurement journal
+(IT services, CPV 72), drop closed ones and those outside your countries or value range, and rank the rest by how
+similar their text is to your description.</li>
+<li>Your page and RSS feed list the best 30, each with the reasons it matched. Always read the official notice before bidding.</li>
+</ol>
+<p><a class="btn" href="{SIGNUP_URL}">Get my tender feed</a></p>
+<p class="meta">Sign-up is a short form on GitHub (needs a free GitHub account). Everything you type is public, so don't include
+personal data. A bot replies with your links within minutes. You can remove your feed the same way.</p>
+<h2>How good is the ranking?</h2>{headline_html(headline)}
+<p class="meta"><a href="{REPO}/blob/main/docs/evaluation.md">Full evaluation and limitations</a>. Coverage: only tenders above the EU
+thresholds are published on TED; most small, local contracts are only on national portals.</p>
 <h2>Example profiles</h2>{profs}
+{f'<p class="meta">Plus {n_self} self-serve feed{"s" if n_self != 1 else ""}.</p>' if n_self else ""}
 <h2>Browse open tenders</h2><p class="meta" id="count">{min(len(rows), 50)} newest of {len(rows)} open tenders (filters need JavaScript)</p>
 <div class="filters">
 <label>Search<input id="f-q" type="search" placeholder="title or buyer"></label>
@@ -199,6 +235,8 @@ def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfi
     # Newest first, matching the JS default sort, so server-rendered rows are what JS shows too.
     rows = sorted(({k: t[k] for k in keep} for t in open_), key=lambda r: r["published"], reverse=True)
     (out / "tenders.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    (out / "index.html").write_text(index_page(summaries, rows), encoding="utf-8")
+    summary = Path(profiles_dir).parent / "data" / "backtest-summary.json"
+    headline = json.loads(summary.read_text(encoding="utf-8")) if summary.exists() else None
+    (out / "index.html").write_text(index_page(summaries, rows, headline), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return open_
