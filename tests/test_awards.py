@@ -18,6 +18,10 @@ from tender_radar.awards import clean_award, normalise_id, normalise_name, resol
         ("ZENIT Informatikai Korlátolt Felelősségű Társaság", "zenit informatikai"),
         ("Société Générale S.A.", "societe generale"),
         ("Tietoevry Oyj", "tietoevry"),
+        ("Leadership Business Consulting, S.A.", "leadership business consulting"),
+        ("Leadership Business Consulting S A", "leadership business consulting"),
+        ("Cloudware Polska Sp.o.o.", "cloudware polska"),
+        ("ARCDATA PRAHA, s r o", "arcdata praha"),
         ("Atea A/S", "atea"),
         ("Łukasiewicz Sp. z o.o.", "lukasiewicz"),
         ("ΔΕΛΤΑ ΑΕ", "δελτα"),
@@ -100,3 +104,18 @@ def test_resolve_groups_by_id_and_by_name_within_country():
     assert ents[0] == ents[1] == ents[2]
     assert len({ents[0], ents[3], ents[4]}) == 3
     assert ents[4] == ents[5]
+
+
+def test_resolve_does_not_merge_different_firms_sharing_an_id():
+    """TED often lists a consortium partner's or other tenderer's ID: same ID alone is not enough."""
+    w = lambda norm, wid: {"winner_norm": norm, "winner_id": wid, "winner_country": "NLD"}  # noqa: E731
+    ents = resolve(
+        [
+            w("atabix", "17084945"),
+            w("visma circle", "17084945"),
+            w("glintt global", "50354"),
+            w("glintt global intelligent technologies", "50354"),
+        ]
+    )
+    assert ents[0] != ents[1]
+    assert ents[2] == ents[3]

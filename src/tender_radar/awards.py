@@ -1,8 +1,11 @@
 """Contract award notices: who won what, and which wins belong to the same company.
 
 Entity resolution is deliberately simple so every grouping can be explained:
-two wins belong to the same company if they share a national ID (same winner
-country), or the same normalised name in the same winner country.
+two wins belong to the same company if they have the same normalised name in the
+same winner country, or the same national ID AND the same first word of the
+normalised name. The first-word condition is there because TED's winner IDs are
+unreliable: in two years of CPV-72 awards, 1,697 of 16,048 IDs carried more than one
+name, and many of those were different firms (consortium partners, other tenderers).
 """
 
 import re
@@ -98,6 +101,10 @@ LEGAL_SUFFIXES = sorted(
         "co",
         "company",
         "sp z oo",
+        "sp oo",
+        "spoo",
+        "s a",
+        "s r o",
         "spz oo",
         "sp zoo",
         "sp k",
@@ -234,7 +241,7 @@ def clean_award(n: dict) -> list[dict]:
 
 
 def resolve(wins: list[dict]) -> list[int]:
-    """Entity number for each win (union-find over shared national IDs and shared names)."""
+    """Entity number for each win (union-find over shared names, and shared IDs with the same first word)."""
     parent = {}
 
     def find(x):
@@ -249,7 +256,8 @@ def resolve(wins: list[dict]) -> list[int]:
         name_key = ("name", w["winner_country"], w["winner_norm"])
         find(name_key)
         if w["winner_id"]:
-            parent[find(name_key)] = find(("id", w["winner_country"], w["winner_id"]))
+            first_word = w["winner_norm"].split()[0]
+            parent[find(name_key)] = find(("id", w["winner_country"], w["winner_id"], first_word))
         keys.append(name_key)
     roots, out = {}, []
     for k in keys:
