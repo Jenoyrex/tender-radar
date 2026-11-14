@@ -26,7 +26,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [x] **B3** Removal via issue form → profile deleted. Check: `pytest tests/test_signup.py -k remove`; real issue closes the test profile.
 - [x] **B4** Feedback issues → `data/feedback.csv` + counts; in the daily workflow.
   Check: `pytest tests/test_feedback.py`; `tender-radar feedback` runs against GitHub; step present in daily.yml.
-- [ ] **B5** Home page explains what/who/how to sign up and shows the backtest headline.
+- [x] **B5** Home page explains what/who/how to sign up and shows the backtest headline.
   Check: open the built `site/index.html` and read it.
 
 ## C. Quality
@@ -35,7 +35,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [x] **C3** `ruff check` and `ruff format --check` pass, run in CI. Check: both commands; tests.yml step.
 - [x] **C4** Live site: index, every profile page and feed load, no broken links, fits 375px; link checker in CI.
   Check: `py -m tender_radar.linkcheck https://jenoyrex.github.io/tender-radar/`; 375px screenshot.
-- [ ] **C5** README final (pitch, live link, screenshot, diagram, headline, sign-up, local run, attribution, limitations, licence).
+- [x] **C5** README final (pitch, live link, screenshot, diagram, headline, sign-up, local run, attribution, limitations, licence).
   Check: read README against this list; image file exists.
 - [ ] **C6** docs/WRITEUP.md, 600–900 words, honest. Check: word count; read it.
 - [ ] **C7** v1.0.0 release with notes. Check: `gh release view v1.0.0`.

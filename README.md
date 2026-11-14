@@ -138,28 +138,29 @@ python -m tender_radar.linkcheck https://jenoyrex.github.io/tender-radar/
 
 ## Evaluation
 
-Using CPV codes as weak ground truth (the matcher never sees them), I tested
-whether a profile built from one CPV group's tenders pulls that group to the top.
-Precision@10, averaged over 11 IT sub-sectors:
+**Main evaluation: an award-notice backtest on real behaviour.** For 1,427
+companies with 4+ EU IT contract wins in the last two years, a profile was built
+from each company's earlier wins (exactly like "profile from company name"), and
+the matcher ranked every tender open in its countries on the day its next winning
+tender was published. Companies were split into dev and test halves; choices were
+made on dev.
 
-| Method | A: profile = 10 sampled tenders | B: profile = one English sentence |
-|---|---|---|
-| Random ranking | 0.09 | 0.09 |
-| TF-IDF words (baseline) | **0.25** | 0.16 |
-| TF-IDF character 3-5-grams (**shipped**) | 0.22 | **0.21** |
-| all-MiniLM-L6-v2 (English) | 0.20 | **0.21** |
-| paraphrase-multilingual-MiniLM-L12-v2 | 0.15 | **0.21** |
+| On the 713 test-half companies | Top 10 | Top 50 | Median rank |
+|---|---|---|---|
+| **Shipped: character 3-5-gram TF-IDF + CPV boost** | **52%** | **78%** | 9 |
+| Best challenger (blend with multilingual-e5, chosen on dev) | 54% | 79% | 8 |
+| Baseline: same main CPV code as past wins | 22% | 56% | 38 |
+| Baseline: random order | 14% | 50% | 50 |
 
-The sentence-transformers models **did not beat TF-IDF**, so the site ships the
-simpler character n-gram TF-IDF, which works across languages without PyTorch.
-All methods are only 2–3× better than random.
-
-**Round 2** added 150 labelled (profile, tender) pairs (144 labelled by an AI, 6 by a
-human) and a held-out dev/test split. TF-IDF on English titles + CPV labels,
-multilingual-e5-small and a blend were tested: **none clearly beat the current
-model on the test half** (P@10 0.27 for both current and the best challenger),
-so nothing changed. The full method, both tables and caveats are in
-[docs/evaluation.md](docs/evaluation.md).
+The shipped matcher beats both baselines clearly (95% bootstrap CIs well above
+zero). The e5 blend's +2 points has a CI from −0.3 to +4.3 points, so it does
+**not** clearly win and the simpler matcher stays (it also keeps PyTorch out of
+the daily job). Caveats: the lists were short (median ~136 open tenders, because
+the profile's countries come from the company's own wins), only the one tender the
+company actually won counts as a hit, and companies with many wins skew large.
+Method, all tables, a breakdown by company size, and the earlier label and CPV-proxy
+rounds are in [docs/evaluation.md](docs/evaluation.md); how winners were matched
+across notices is in [docs/entity-sample.md](docs/entity-sample.md).
 
 ## Limitations
 
@@ -174,6 +175,12 @@ so nothing changed. The full method, both tables and caveats are in
   as "see notice".
 - **Duplicates.** Buyers sometimes re-publish a call under a new notice number;
   pages keep only the newest per (buyer, title).
+- **Accuracy is measured on past winners.** The backtest only sees companies with
+  4+ wins, profiled from those wins; how well a few typed sentences work for a
+  first-time bidder is only covered by the weaker earlier evaluations. See the
+  limitations list in [docs/evaluation.md](docs/evaluation.md).
+- **Only IT services (CPV 72)** by default; other sectors need a one-line change
+  in `config.yaml` and have not been evaluated.
 - **Unofficial.** This is a hobby project, not affiliated with the EU or TED.
   Always read the official notice before bidding.
 
