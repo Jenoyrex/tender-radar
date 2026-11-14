@@ -11,6 +11,22 @@ import unicodedata
 
 from .clean import SchemaError, _date
 
+DESC_CHARS = 300  # per win in a profile; long descriptions would drown the titles
+
+
+def _first(d) -> str:
+    """TED multilingual dict -> one string (English if present)."""
+    if not isinstance(d, dict) or not d:
+        return ""
+    v = d.get("eng") or next(iter(d.values()))
+    return " ".join(v) if isinstance(v, list) else (v or "")
+
+
+def win_text(n: dict) -> str:
+    """One past win as profile text: title + start of description (raw TED award notice)."""
+    return f"{_first(n.get('title-proc'))}. {_first(n.get('description-proc'))[:DESC_CHARS]}".strip()
+
+
 WIN_COLUMNS = [
     "notice_id",
     "procedure_id",
@@ -19,7 +35,8 @@ WIN_COLUMNS = [
     "decision_date",
     "buyer_country",
     "main_cpv",
-    "title",
+    "text",
+    "title_en",
     "winner_name",
     "winner_norm",
     "winner_id",
@@ -186,8 +203,7 @@ def clean_award(n: dict) -> list[dict]:
     # winner-identifier/-country are per tenderer and only line up with names when the
     # counts match; otherwise keep the name and drop the ID rather than guess a pairing.
     aligned = len(ids) == len(names)
-    title = n.get("title-proc") or n.get("notice-title") or {}
-    title = (title.get("eng") or next(iter(title.values()), "")) if isinstance(title, dict) else ""
+    text, title_en = win_text(n), _first(n.get("notice-title"))
     rows = {}
     for i, name in enumerate(names):
         norm = normalise_name(name)
@@ -201,7 +217,8 @@ def clean_award(n: dict) -> list[dict]:
             "decision_date": _date(n["winner-decision-date"][0]) if n.get("winner-decision-date") else None,
             "buyer_country": (n.get("buyer-country") or [None])[0],
             "main_cpv": (n.get("main-classification-proc") or [None])[0],
-            "title": title if isinstance(title, str) else " ".join(title),
+            "text": text,  # original-language title + description start (profile text)
+            "title_en": title_en,  # "Country – CPV label – title" template (English view)
             "winner_name": name,
             "winner_norm": norm,
             "winner_id": normalise_id(ids[i]) if aligned else None,

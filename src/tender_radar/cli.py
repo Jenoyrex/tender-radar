@@ -98,6 +98,30 @@ def cmd_history(cfg, args):
     return 0
 
 
+def cmd_backtest(cfg, args):
+    import json
+
+    from . import backtest
+
+    tenders, wins = backtest.load(cfg["history_db"])
+    vecs = query = None
+    if not args.no_e5:
+        vecs = match.cached_embeddings(
+            tenders,
+            Path(cfg["history_db"]).parent / "emb-e5-history.npz",
+            match.E5_MODEL,
+            text_fn=match.e5_text,
+            prefix="passage: ",
+        )
+        query = lambda q: match.embed([q], match.E5_MODEL, prefix="query: ")[0]  # noqa: E731
+    results, funnel = backtest.run(tenders, wins, vecs, query, min_wins=args.min_wins)
+    out = Path(cfg["history_db"]).parent / "backtest-results.json"
+    out.write_text(json.dumps({"funnel": funnel, "results": results}, default=str), encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
+    print(backtest.to_markdown(results, funnel))
+    return 0
+
+
 def cmd_profile_from_company(cfg, args):
     from . import company
 
@@ -214,6 +238,9 @@ def main(argv=None):
     pc = sub.add_parser("profile-from-company", help="build a profile YAML from a company's past TED wins")
     pc.add_argument("name")
     pc.add_argument("--write", action="store_true", help="save to profiles/<slug>.yaml instead of printing")
+    bt = sub.add_parser("backtest", help="award-notice backtest on history_db (prints markdown)")
+    bt.add_argument("--no-e5", action="store_true", help="skip the multilingual-e5 matcher and blends")
+    bt.add_argument("--min-wins", type=int, default=4)
     sub.add_parser("feedback", help="collect 👍/👎 feedback issues into data/feedback.csv")
     iss = sub.add_parser("issue", help="handle a sign-up/removal GitHub issue event (used by signup.yml)")
     iss.add_argument("event", help="path to the GitHub event JSON")
@@ -231,6 +258,7 @@ def main(argv=None):
         "profile-from-company": cmd_profile_from_company,
         "issue": cmd_issue,
         "feedback": cmd_feedback,
+        "backtest": cmd_backtest,
     }
     sys.exit(cmds[args.cmd](cfg, args))
 

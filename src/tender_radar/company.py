@@ -10,22 +10,9 @@ import re
 import yaml
 
 from . import ted
-from .awards import _names, normalise_name
+from .awards import DESC_CHARS, _names, normalise_name, win_text  # noqa: F401  (DESC_CHARS re-exported)
 
-DESC_CHARS = 300  # per win; long descriptions would drown the titles
 MAX_WINS = 40
-
-
-def _first(d) -> str:
-    if not isinstance(d, dict) or not d:
-        return ""
-    v = d.get("eng") or next(iter(d.values()))
-    return " ".join(v) if isinstance(v, list) else (v or "")
-
-
-def win_text(n: dict) -> str:
-    """One past win as text: title + start of description (raw TED award notice)."""
-    return f"{_first(n.get('title-proc'))}. {_first(n.get('description-proc'))[:DESC_CHARS]}".strip()
 
 
 def profile_text(texts: list[str]) -> str:
@@ -55,19 +42,33 @@ def slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", normalise_name(s)).strip("-")[:40] or "company"
 
 
-def make_profile(name: str, wins: list[dict]) -> dict:
-    """Profile dict (same keys as profiles/*.yaml). Raises ValueError if there are no wins."""
-    if not wins:
+def profile_from_rows(name: str, rows: list[dict]) -> dict:
+    """Profile dict (same keys as profiles/*.yaml) from win rows {text, buyer_country, main_cpv},
+    newest first. Shared by `profile-from-company` and the award backtest."""
+    if not rows:
         raise ValueError(f"no CPV-matching TED award notices won by {name!r}")
-    countries = collections.Counter(c for n in wins for c in (n.get("buyer-country") or [])[:1])
-    cpvs = collections.Counter(c[:4] for n in wins for c in (n.get("main-classification-proc") or [])[:1])
+    rows = rows[:MAX_WINS]
+    cpvs = collections.Counter((r["main_cpv"] or "")[:4] for r in rows if r["main_cpv"])
     return {
-        "name": f"{name} (from {len(wins)} past TED wins)",
-        "description": profile_text([win_text(n) for n in wins]),
-        "countries": sorted(countries),
+        "name": f"{name} (from {len(rows)} past TED wins)",
+        "description": profile_text([r["text"] for r in rows]),
+        "countries": sorted({r["buyer_country"] for r in rows if r["buyer_country"]}),
         "cpv": [c for c, _ in cpvs.most_common(4)],
         "exclude_keywords": [],
     }
+
+
+def make_profile(name: str, wins: list[dict]) -> dict:
+    """Profile dict from raw TED award notices (newest first). Raises ValueError if there are none."""
+    rows = [
+        {
+            "text": win_text(n),
+            "buyer_country": (n.get("buyer-country") or [None])[0],
+            "main_cpv": (n.get("main-classification-proc") or [None])[0],
+        }
+        for n in wins
+    ]
+    return profile_from_rows(name, rows)
 
 
 def to_yaml(profile: dict) -> str:
