@@ -2,7 +2,7 @@
 
 Entity resolution is deliberately simple so every grouping can be explained:
 two wins belong to the same company if they have the same normalised name in the
-same winner country, or the same national ID AND the same first word of the
+same winner country (for names of 4 characters or fewer, also the same ID), or the same national ID AND the same first word of the
 normalised name. The first-word condition is there because TED's winner IDs are
 unreliable: in two years of CPV-72 awards, 1,697 of 16,048 IDs carried more than one
 name, and many of those were different firms (consortium partners, other tenderers).
@@ -162,6 +162,9 @@ LEGAL_SUFFIXES = sorted(
     key=lambda s: -len(s),
 )  # longest first, so "gmbh co kg" wins over "kg"
 
+# Names this short ("OCI", "M.T.") are shared by unrelated firms: they only match with the same ID.
+SHORT_NAME = 4
+
 # Legal forms written BEFORE the name (Lithuania, Latvia, Estonia, some Nordic/Czech usage).
 LEGAL_PREFIXES = {"uab", "ab", "sia", "as", "ou", "vsi", "ao", "oy", "aps"}
 
@@ -170,7 +173,11 @@ _ID_JUNK = re.compile(r"[^0-9A-Z]")
 
 def normalise_name(name: str) -> str:
     """'ACME Software GmbH & Co. KG' -> 'acme software'. Empty string if nothing is left."""
-    s = unicodedata.normalize("NFKD", name or "")
+    # e-procurement artefacts: Swiss language tags ("DE_EBP Schweiz AG", "FR_kiwi …") and
+    # Irish portal suffixes ("Grant Thornton_21346"); left in, they split one firm in two.
+    name = re.sub(r"^(?:DE|FR|IT|EN|RM)_", "", (name or "").strip(), flags=re.I)
+    name = re.sub(r"_\d+$", "", name)
+    s = unicodedata.normalize("NFKD", name)
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
     s = s.replace("ł", "l").replace("ø", "o").replace("ß", "ss").replace("đ", "d")
     s = s.replace(".", "")  # S.L. -> sl, s.r.o. -> sro, Sp. z o.o. -> sp z oo
@@ -261,6 +268,8 @@ def resolve(wins: list[dict]) -> list[int]:
     keys = []
     for w in wins:
         name_key = ("name", w["winner_country"], w["winner_norm"])
+        if len(w["winner_norm"].replace(" ", "")) <= SHORT_NAME:  # "OCI", "m t": too generic on its own
+            name_key += (w["winner_id"],)
         find(name_key)
         if w["winner_id"]:
             first_word = w["winner_norm"].split()[0]
@@ -312,8 +321,8 @@ def report(con: sqlite3.Connection, n_notices: int) -> str:
         f"| … linked by either route | {pct(either, with_winner)} |",
         f"| (notice, winner) rows | {n_wins:,}, {pct(with_id, n_wins)} with a usable national ID |",
         f"| Distinct raw winner names (per country) | {names:,} |",
-        f"| … after name normalisation | {norms:,} |",
-        f"| … after also grouping by national ID = **companies** | **{ents:,}** |",
+        f"| Distinct normalised names (per country) | {norms:,} |",
+        f"| **Companies** after entity resolution (ID + first word joins names; names of ≤4 characters split by ID) | **{ents:,}** |",
         f"| Companies with 4+ wins (distinct procedures) | **{four:,}** |",
         f"| … with 4+ wins linked to a contract notice (usable for the backtest) | **{four_linked:,}** |",
         "",

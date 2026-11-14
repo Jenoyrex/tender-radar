@@ -6,7 +6,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 ## A. Award backtest
 - [x] **A1** Award + contract-notice backfill complete; `data/history.sqlite` exists.
   Check: `tender-radar history --no-fetch` prints the report; no "failed days" line; days cached = days in window.
-- [ ] **A2** Entity report (distinct winners, companies with 4+ wins); gate ≥100 companies with 4+ linked wins
+- [x] **A2** Entity report (distinct winners, companies with 4+ wins); gate ≥100 companies with 4+ linked wins
   (else widen and record); `docs/entity-sample.md` has 20 random groups, ≤2 of 20 judged wrongly merged.
   Check: report output pasted in docs/evaluation.md; my verdict per group written in entity-sample.md.
 - [ ] **A3** Backtest: profile = all wins but the latest; pool = notices open on the held-out notice's

@@ -21,6 +21,10 @@ from tender_radar.awards import clean_award, normalise_id, normalise_name, resol
         ('UAB "CSC Telecom"', "csc telecom"),
         ("UAB Bitė Lietuva", "bite lietuva"),
         ("SIA Tet", "tet"),
+        ("DE_EBP Schweiz AG", "ebp schweiz"),
+        ("FR_kiwi Consultants AG", "kiwi consultants"),
+        ("Grant Thornton_21346", "grant thornton"),
+        ("Studio_Design GmbH", "studio design"),
         ("AS", "as"),
         ("Leadership Business Consulting, S.A.", "leadership business consulting"),
         ("Leadership Business Consulting S A", "leadership business consulting"),
@@ -97,10 +101,10 @@ def test_resolve_groups_by_id_and_by_name_within_country():
     w = lambda norm, wid, c="DEU": {"winner_norm": norm, "winner_id": wid, "winner_country": c}
     ents = resolve(
         [
-            w("acme", "DE1"),  # 0
-            w("acme software", "DE1"),  # same ID -> same company as 0
-            w("acme", None),  # same name, same country -> 0
-            w("acme", None, "AUT"),  # same name, other country -> different company
+            w("acmesoft", "DE1"),  # 0
+            w("acmesoft software", "DE1"),  # same ID -> same company as 0
+            w("acmesoft", None),  # same name, same country -> 0
+            w("acmesoft", None, "AUT"),  # same name, other country -> different company
             w("other", "DE2"),  # different
             w("other", "DE3"),  # same name as 4 -> joined, even with a different ID
         ]
@@ -123,3 +127,10 @@ def test_resolve_does_not_merge_different_firms_sharing_an_id():
     )
     assert ents[0] != ents[1]
     assert ents[2] == ents[3]
+
+
+def test_resolve_short_names_need_the_same_id():
+    w = lambda norm, wid: {"winner_norm": norm, "winner_id": wid, "winner_country": "FRA"}  # noqa: E731
+    ents = resolve([w("oci", "502770118"), w("oci", "795151885"), w("oci", "502770118"), w("m t", None), w("m t", None)])
+    assert ents[0] == ents[2] and ents[0] != ents[1]
+    assert ents[3] == ents[4]  # no ID on either: still grouped by name
