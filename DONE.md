@@ -33,7 +33,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [ ] **C1** All tests pass locally and in CI; every new module has tests. Check: `py -m pytest`; `gh run list -w tests` green.
 - [ ] **C2** Daily workflow green end to end; runtime recorded in README. Check: `gh run list -w daily`; `gh run view` timing.
 - [x] **C3** `ruff check` and `ruff format --check` pass, run in CI. Check: both commands; tests.yml step.
-- [ ] **C4** Live site: index, every profile page and feed load, no broken links, fits 375px; link checker in CI.
+- [x] **C4** Live site: index, every profile page and feed load, no broken links, fits 375px; link checker in CI.
   Check: `py -m tender_radar.linkcheck https://jenoyrex.github.io/tender-radar/`; 375px screenshot.
 - [ ] **C5** README final (pitch, live link, screenshot, diagram, headline, sign-up, local run, attribution, limitations, licence).
   Check: read README against this list; image file exists.
