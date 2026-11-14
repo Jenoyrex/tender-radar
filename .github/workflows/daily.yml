@@ -9,11 +9,12 @@ permissions:
   pages: write
   id-token: write
   issues: read      # tender-radar feedback
-concurrency: {group: daily, cancel-in-progress: false}
 env:
   PYTHONUTF8: "1"   # UTF-8 for all text I/O, whatever the runner locale
 jobs:
   update:
+    # Job-level, so it also serialises runs called from signup.yml (one Pages deploy at a time).
+    concurrency: {group: pages-deploy, cancel-in-progress: false}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
