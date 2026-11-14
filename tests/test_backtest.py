@@ -128,3 +128,35 @@ def test_to_markdown_labels_every_matcher():
     md = backtest.to_markdown(rs, {"usable cases": 6})
     assert "Baseline: random order" in md and "multilingual-e5-small" in md and "Blend w=0.5" in md
     assert "chosen on dev" in md and "95% bootstrap CI" in md
+
+
+def test_variants_use_same_cases_and_change_only_the_profile():
+    europe = backtest.case_profile(backtest.make_cases(TENDERS, WINS)[0][0], "europe")
+    one = backtest.case_profile(backtest.make_cases(TENDERS, WINS)[0][0], "one-win")
+    assert europe.countries == [] and "(from 3 past" in europe.name
+    assert "(from 1 past" in one.name and one.countries == ["DEU"]
+    res_e, _ = backtest.run(TENDERS, WINS, variant="europe")
+    res_d, _ = backtest.run(TENDERS, WINS)
+    assert [r["entity"] for r in res_e] == [r["entity"] for r in res_d]
+    assert res_e[0]["pool"] == res_d[0]["pool"] + 1  # the French notice is no longer filtered out
+
+
+def test_repeat_buyer_flag_and_split():
+    wins = [dict(w) for w in WINS]
+    for w in wins:
+        w["buyer"] = "Stadt Musterstadt"
+    tenders = [dict(t) for t in TENDERS]
+    tenders[0]["buyer"] = "STADT MUSTERSTADT"  # the held-out contract notice: same buyer, different spelling
+    res, _ = backtest.run(tenders, wins)
+    assert res[0]["repeat_buyer"] is True
+    tenders[0]["buyer"] = "Landkreis Beispiel"
+    res2, _ = backtest.run(tenders, wins)
+    assert res2[0]["repeat_buyer"] is False
+    md = backtest.repeat_split(res + res2)
+    assert "repeat" in md and "new to this company" in md and "New buyers only" in md
+
+
+def test_same_buyer_normalises_names():
+    assert backtest.same_buyer("Ayuntamiento de Madrid", "AYUNTAMIENTO DE MADRID.")
+    assert not backtest.same_buyer("Ayuntamiento de Madrid", None)
+    assert not backtest.same_buyer("Stadt A", "Stadt B")

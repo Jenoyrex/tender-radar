@@ -100,35 +100,36 @@ def cmd_history(cfg, args):
 
 
 def cmd_backtest(cfg, args):
+    """Award backtest. Only the default variant with e5 is the published run (data/backtest-results.json +
+    the home-page summary); other runs go to data/backtest-results-<variant>[-noe5].json."""
     import json
 
     from . import backtest
 
-    saved = Path(cfg["history_db"]).parent / "backtest-results.json"
-    if args.report_only:  # re-render from the last run without recomputing
+    main_run = args.variant == "default" and not args.no_e5
+    name = "backtest-results" + ("" if main_run else f"-{args.variant}" + ("-noe5" if args.no_e5 else "")) + ".json"
+    saved = Path(cfg["history_db"]).parent / name
+    if args.report_only:  # re-render from a saved run without recomputing
         d = json.loads(saved.read_text(encoding="utf-8"))
-        summary = backtest.summary(d["results"])
-        util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(summary, indent=1) + "\n")
-        sys.stdout.reconfigure(encoding="utf-8")
-        print(backtest.to_markdown(d["results"], collections.Counter(d["funnel"])))
-        return 0
-    tenders, wins = backtest.load(cfg["history_db"])
-    vecs = query = None
-    if not args.no_e5:
-        vecs = match.cached_embeddings(
-            backtest.pool_members(tenders, wins, args.min_wins),
-            Path(cfg["history_db"]).parent / "emb-e5-history.npz",
-            match.E5_MODEL,
-            text_fn=match.e5_text,
-            prefix="passage: ",
-        )
-        query = lambda q: match.embed([q], match.E5_MODEL, prefix="query: ")[0]  # noqa: E731
-    results, funnel = backtest.run(tenders, wins, vecs, query, min_wins=args.min_wins)
-    out = Path(cfg["history_db"]).parent / "backtest-results.json"
-    util.write_text(out, json.dumps({"funnel": funnel, "results": results}, default=str))
-    summary = backtest.summary(results)
-    util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(summary, indent=1) + "\n")
+        results, funnel = d["results"], collections.Counter(d["funnel"])
+    else:
+        tenders, wins = backtest.load(cfg["history_db"])
+        vecs = query = None
+        if not args.no_e5:
+            vecs = match.cached_embeddings(
+                backtest.pool_members(tenders, wins, args.min_wins),
+                Path(cfg["history_db"]).parent / "emb-e5-history.npz",
+                match.E5_MODEL,
+                text_fn=match.e5_text,
+                prefix="passage: ",
+            )
+            query = lambda q: match.embed([q], match.E5_MODEL, prefix="query: ")[0]  # noqa: E731
+        results, funnel = backtest.run(tenders, wins, vecs, query, min_wins=args.min_wins, variant=args.variant)
+        util.write_text(saved, json.dumps({"variant": args.variant, "funnel": funnel, "results": results}, default=str))
+    if main_run:
+        util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(backtest.summary(results), indent=1) + "\n")
     sys.stdout.reconfigure(encoding="utf-8")
+    print(f"Variant: {args.variant} ({backtest.VARIANTS[args.variant]})\n")
     print(backtest.to_markdown(results, funnel))
     return 0
 
@@ -224,7 +225,8 @@ def main(argv=None):
     bt = sub.add_parser("backtest", help="award-notice backtest on history_db (prints markdown)")
     bt.add_argument("--no-e5", action="store_true", help="skip the multilingual-e5 matcher and blends")
     bt.add_argument("--min-wins", type=int, default=4)
-    bt.add_argument("--report-only", action="store_true", help="print the report from data/backtest-results.json")
+    bt.add_argument("--report-only", action="store_true", help="print the report from the saved results of this run")
+    bt.add_argument("--variant", default="default", choices=["default", "europe", "one-win"])
     sub.add_parser("feedback", help="collect 👍/👎 feedback issues into data/feedback.csv")
     iss = sub.add_parser("issues", help="process open sign-up/removal issues (used by signup.yml)")
     iss.add_argument("--event", help="only this GitHub event JSON instead of sweeping all open requests")

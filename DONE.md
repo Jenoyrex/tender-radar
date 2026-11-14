@@ -49,5 +49,20 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [x] **D3** Sign-up abuse limits: 1 active profile per GitHub user, ≤20 new sign-ups/day, hard cap 200, issue author
   account ≥7 days old, concurrency group (no racing commits). Check: `pytest tests/test_signup.py -k limit`; README section.
 
+## E. Remaining weaknesses (added 2026-11-14, round 2 of the loop)
+- [ ] **E1** Repeat business: store the buyer on each win; split backtest results into held-out tenders from a buyer
+  the company already won from vs a new buyer. Check: `tender-radar backtest --no-e5 --variant default` prints the split;
+  tests in tests/test_backtest.py.
+- [ ] **E2** Harder setting: backtest variant with no country filter (Europe-wide pool, ~thousands of notices).
+  Check: `--variant europe` prints hit@10/50 for shipped vs baselines with bootstrap CI.
+- [ ] **E3** Cold start: profile from the single most recent earlier win (closest proxy for a newcomer's short
+  description). Check: `--variant one-win` prints results; tests.
+- [ ] **E4** evaluation.md, README, home page and WRITEUP report E1–E3 honestly (WRITEUP stays 600–900 words).
+  Check: read; links checker; word count.
+- [ ] **E5** Final audit of A–E from a clean clone; release v1.1.0. Check: all checks re-run; `gh release view v1.1.0`.
+
+Out of scope, with reasons: real users/feedback (cannot be produced by me); national procurement portals (a separate
+source per country, each its own project).
+
 ## Blocked
 None. Every item was verified; the audit reopened C2 once (see LOOP_LOG.md) and it passed again.

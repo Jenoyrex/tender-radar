@@ -74,9 +74,25 @@ def make_cases(tenders: list[dict], wins: list[dict], min_wins: int = MIN_WINS) 
     return cases, funnel
 
 
-def case_profile(c: Case) -> match.Profile:
-    prof = company.profile_from_rows(c.name, c.train)
+VARIANTS = {
+    "default": "profile from all earlier wins; pool = notices open in the countries of those wins",
+    "europe": "same profile, but no country filter: the pool is every open CPV-72 notice in Europe",
+    "one-win": "profile from the single most recent earlier win only (cold start); pool as default",
+}
+
+
+def case_profile(c: Case, variant: str = "default") -> match.Profile:
+    prof = company.profile_from_rows(c.name, c.train[:1] if variant == "one-win" else c.train)
+    if variant == "europe":
+        prof["countries"] = []
     return match.Profile(slug=str(c.entity), **prof)
+
+
+def same_buyer(a: str | None, b: str | None) -> bool:
+    """Buyer names are free text; compare them with the winner-name normaliser."""
+    from .awards import normalise_name
+
+    return bool(a and b) and normalise_name(a) == normalise_name(b)
 
 
 def pool(tenders: list[dict], d: str, p: match.Profile) -> list[dict]:
@@ -101,16 +117,17 @@ def z(x: np.ndarray) -> np.ndarray:
     return (x - x.mean()) / (x.std() or 1)
 
 
-def scores(c: Case, p: match.Profile, cands: list[dict], labels: dict, e5_vecs: dict | None, e5_query=None) -> dict:
-    """{matcher: score array over cands}."""
+def scores(c: Case, p: match.Profile, cands: list[dict], labels: dict, e5_vecs: dict | None, e5_query=None, train=None) -> dict:
+    """{matcher: score array over cands}. `train`: the wins the profile was built from (default all)."""
+    train = c.train if train is None else train
     char = match.tfidf_similarity(p.description, [match.tender_text(t) for t in cands])
     cpv = np.array([bool(match.cpv_hits(t, p.cpv)) for t in cands], dtype=float)
-    english_q = company.profile_text([w["title_en"] or "" for w in c.train])
+    english_q = company.profile_text([w["title_en"] or "" for w in train])
     out = {
         "char-tfidf": char,
         CURRENT: char + match.CPV_BOOST * cpv,
         "english-tfidf": match.tfidf_similarity(english_q, [match.english_text(t, labels) for t in cands], analyzer="word"),
-        "same-main-cpv": np.array([sum(w["main_cpv"] == t["main_cpv"] for w in c.train) for t in cands], dtype=float),
+        "same-main-cpv": np.array([sum(w["main_cpv"] == t["main_cpv"] for w in train) for t in cands], dtype=float),
         "random": np.random.default_rng(c.entity).random(len(cands)),
     }
     if e5_vecs is not None:
@@ -129,17 +146,31 @@ def rank_of(s: np.ndarray, target: np.ndarray) -> float:
     return 1 + above + ties / 2
 
 
-def run(tenders: list[dict], wins: list[dict], e5_vecs: dict | None = None, e5_query=None, min_wins: int = MIN_WINS):
-    """Per-case results: list of {entity, name, part, pool, filtered_out, ranks: {matcher: rank or None}}."""
+def run(
+    tenders: list[dict],
+    wins: list[dict],
+    e5_vecs: dict | None = None,
+    e5_query=None,
+    min_wins: int = MIN_WINS,
+    variant: str = "default",
+):
+    """Per-case results: list of {entity, name, part, pool, filtered_out, repeat_buyer, ranks: {matcher: rank}}.
+    The same cases (and dev/test split) are used for every variant, so the variants compare directly."""
     cases, funnel = make_cases(tenders, wins, min_wins)
+    buyer_of = {}
+    for t in tenders:
+        if t["procedure_id"]:
+            buyer_of.setdefault(t["procedure_id"], t["buyer"])
     labels = match.cpv_label_map(tenders)
     order = [c.entity for c in cases]
     random.Random(0).shuffle(order)
     part = {e: ("dev" if i % 2 == 0 else "test") for i, e in enumerate(order)}
     results = []
     for c in cases:
-        p = case_profile(c)
+        p = case_profile(c, variant)
+        train = c.train[:1] if variant == "one-win" else c.train
         cands = pool(tenders, c.date, p)
+        held_buyer = buyer_of.get(c.held["procedure_id"])
         target = np.array([t["procedure_id"] == c.held["procedure_id"] for t in cands], dtype=bool)
         r = {
             "entity": c.entity,
@@ -149,10 +180,12 @@ def run(tenders: list[dict], wins: list[dict], e5_vecs: dict | None = None, e5_q
             "pool": len(cands),
             "train": len(c.train),
             "filtered_out": not target.any(),
+            # the held-out tender's buyer already awarded this company one of the wins in its full history
+            "repeat_buyer": any(same_buyer(held_buyer, w.get("buyer")) for w in c.train),
             "ranks": {},
         }
         if target.any():
-            for m, s in scores(c, p, cands, labels, e5_vecs, e5_query).items():
+            for m, s in scores(c, p, cands, labels, e5_vecs, e5_query, train).items():
                 r["ranks"][m] = rank_of(s, target)
         results.append(r)
     return results, funnel
@@ -252,7 +285,31 @@ def to_markdown(results: list[dict], funnel: collections.Counter) -> str:
     for base in ("random", "same-main-cpv"):
         diff, lo, hi = bootstrap_diff(test, CURRENT, base)
         out.append(f"Test, shipped minus {base}, hit@10: {diff:+.3f} (95% CI {lo:+.3f} to {hi:+.3f}).")
+    if results and "repeat_buyer" in results[0]:
+        out += ["", repeat_split(results)]
     return "\n".join(out) + "\n"
+
+
+def repeat_split(results: list[dict]) -> str:
+    """Dev + test, by whether the held-out tender's buyer had already awarded the company a contract."""
+    out = [
+        "#### Repeat business vs new buyer (dev + test)",
+        "",
+        "| Held-out tender's buyer | Companies | Shipped hit@10 | Same-CPV hit@10 | Random hit@10 | Shipped hit@50 |",
+        "|---|---|---|---|---|---|",
+    ]
+    for label, flag in (("already awarded this company a win (repeat)", True), ("new to this company", False)):
+        rs = [r for r in results if r["repeat_buyer"] == flag]
+        if not rs:
+            continue
+        m, c, rnd = metrics(rs, CURRENT), metrics(rs, "same-main-cpv"), metrics(rs, "random")
+        out.append(f"| {label} | {len(rs)} | {m['hit@10']:.3f} | {c['hit@10']:.3f} | {rnd['hit@10']:.3f} | {m['hit@50']:.3f} |")
+    new = [r for r in results if not r["repeat_buyer"]]
+    if new:
+        diff, lo, hi = bootstrap_diff(new, CURRENT, "random")
+        out.append("")
+        out.append(f"New buyers only, shipped minus random, hit@10: {diff:+.3f} (95% CI {lo:+.3f} to {hi:+.3f}).")
+    return "\n".join(out)
 
 
 def summary(results: list[dict]) -> dict:

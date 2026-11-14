@@ -41,6 +41,7 @@ WIN_COLUMNS = [
     "main_cpv",
     "text",
     "title_en",
+    "buyer",
     "winner_name",
     "winner_norm",
     "winner_id",
@@ -240,6 +241,7 @@ def clean_award(n: dict) -> list[dict]:
             "main_cpv": (n.get("main-classification-proc") or [None])[0],
             "text": text,  # original-language title + description start (profile text)
             "title_en": title_en,  # "Country – CPV label – title" template (English view)
+            "buyer": _first(n.get("buyer-name")) or None,
             "winner_name": name,
             "winner_norm": norm,
             "winner_id": normalise_id(ids[i]) if aligned else None,
