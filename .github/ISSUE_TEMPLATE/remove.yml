@@ -1,0 +1,14 @@
+name: Remove my tender feed
+description: Delete a feed you created with "Get my tender feed".
+title: "Remove my tender feed"
+labels: ["remove-feed"]
+body:
+  - type: markdown
+    attributes:
+      value: Only the person who opened the original sign-up issue (or a maintainer) can remove a feed.
+  - type: input
+    attributes:
+      label: Your feed page or sign-up issue number
+      description: Paste your feed page link (…/p/your-feed-12.html) or the sign-up issue number (e.g. 12).
+    validations:
+      required: true

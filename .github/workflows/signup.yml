@@ -1,0 +1,69 @@
+name: signup
+# Self-serve sign-up / removal from the issue forms in .github/ISSUE_TEMPLATE.
+# The issue text is untrusted: it only ever reaches Python through the event JSON file,
+# never a ${{ }} expression inside a shell command.
+on:
+  issues:
+    types: [opened]
+concurrency: {group: profiles, cancel-in-progress: false}
+jobs:
+  handle:
+    if: contains(github.event.issue.labels.*.name, 'signup') || contains(github.event.issue.labels.*.name, 'remove-feed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {contents: write, issues: read}
+    outputs:
+      action: ${{ steps.run.outputs.action }}
+    steps:
+      - uses: actions/checkout@v7
+        with: {ref: main}
+      - uses: actions/setup-python@v7
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e .
+      - id: run
+        env: {GITHUB_TOKEN: "${{ github.token }}"}
+        run: |
+          tender-radar issue "$GITHUB_EVENT_PATH" --out "$RUNNER_TEMP/result.json"
+          echo "action=$(jq -r .action "$RUNNER_TEMP/result.json")" >> "$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/result.json" result.json
+      - name: Commit profile change
+        if: steps.run.outputs.action == 'created' || steps.run.outputs.action == 'removed'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A profiles
+          git commit -m "Profile $(jq -r .action result.json): $(jq -r .slug result.json) (issue #${{ github.event.issue.number }})"
+          git pull --rebase && git push
+      - uses: actions/upload-artifact@v5
+        with: {name: result, path: result.json}
+
+  deploy:
+    needs: handle
+    if: needs.handle.outputs.action == 'created' || needs.handle.outputs.action == 'removed'
+    uses: ./.github/workflows/daily.yml
+    permissions: {contents: write, pages: write, id-token: write}
+
+  reply:
+    needs: [handle, deploy]
+    if: always() && needs.handle.result == 'success' && needs.handle.outputs.action != 'ignored'
+    runs-on: ubuntu-latest
+    permissions: {issues: write}
+    steps:
+      - uses: actions/download-artifact@v5
+        with: {name: result}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          DEPLOYED: ${{ needs.deploy.result }}
+        run: |
+          jq -r .comment result.json > comment.md
+          if [ "$(jq -r .action result.json)" != rejected ] && [ "$DEPLOYED" != success ]; then
+            printf '\n\n(The site rebuild did not finish just now; your change will appear after the next daily run.)\n' >> comment.md
+          fi
+          gh issue comment "$ISSUE" --body-file comment.md
+          if [ "$(jq -r .action result.json)" = rejected ]; then
+            gh issue close "$ISSUE" --reason "not planned"
+          else
+            gh issue close "$ISSUE" --reason completed
+          fi

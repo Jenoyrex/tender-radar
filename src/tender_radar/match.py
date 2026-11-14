@@ -29,6 +29,7 @@ class Profile:
     min_value_eur: float | None = None
     max_value_eur: float | None = None
     exclude_keywords: list[str] = field(default_factory=list)
+    signup_issue: int | None = None  # GitHub issue that created it (self-serve sign-up)
 
     @classmethod
     def load(cls, path: Path) -> "Profile":

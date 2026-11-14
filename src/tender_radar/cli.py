@@ -112,6 +112,53 @@ def cmd_profile_from_company(cfg, args):
     return 0
 
 
+def _github(path: str):
+    """GET from the GitHub REST API (GITHUB_TOKEN if set)."""
+    import json
+    import os
+    import urllib.request
+    req = urllib.request.Request(f"https://api.github.com/repos/{os.environ.get('GITHUB_REPOSITORY', 'Jenoyrex/tender-radar')}/{path}",
+                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "tender-radar"})
+    if os.environ.get("GITHUB_TOKEN"):
+        req.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def cmd_issue(cfg, args):
+    """Handle a sign-up / removal issue event. Writes a JSON result for the workflow:
+    {"action": "created"|"removed"|"rejected"|"ignored", "comment": str, "slug": str}."""
+    import json
+
+    import yaml
+
+    from . import company, signup
+    issue = json.loads(Path(args.event).read_text(encoding="utf-8"))["issue"]
+    labels = {lb["name"] for lb in issue.get("labels", [])}
+    profiles = ROOT / "profiles"
+    res = {"action": "ignored", "comment": "", "slug": ""}
+    try:
+        if signup.SIGNUP_LABEL in labels:
+            slug, prof = signup.profile_from_issue(issue, profiles, cfg)
+            (profiles / f"{slug}.yaml").write_text(company.to_yaml(prof), encoding="utf-8")
+            res = {"action": "created", "comment": signup.signup_reply(slug, prof), "slug": slug}
+        elif signup.REMOVE_LABEL in labels:
+            path = signup.removal_target(issue, profiles)
+            n = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("signup_issue")
+            author = _github(f"issues/{n}")["user"]["login"] if n else None
+            if not signup.may_remove(issue, path, author):
+                raise signup.Rejected(f"Only the person who opened sign-up issue #{n} can remove this feed.")
+            path.unlink()
+            res = {"action": "removed", "slug": path.stem,
+                   "comment": f"Removed the feed `{path.stem}`. Its page disappears with the next site build (a few minutes)."}
+    except signup.Rejected as e:
+        res = {"action": "rejected", "comment": f"Sorry, I couldn't process this request: {e}\n\n"
+                                                 "You're welcome to open a new issue with the form.", "slug": ""}
+    Path(args.out).write_text(json.dumps(res), encoding="utf-8")
+    log.info("issue #%s: %s %s", issue.get("number"), res["action"], res["slug"])
+    return 0
+
+
 def cmd_label(cfg, args):
     from . import label
     data = Path(cfg["db_path"]).parent
@@ -152,12 +199,15 @@ def main(argv=None):
     pc = sub.add_parser("profile-from-company", help="build a profile YAML from a company's past TED wins")
     pc.add_argument("name")
     pc.add_argument("--write", action="store_true", help="save to profiles/<slug>.yaml instead of printing")
+    iss = sub.add_parser("issue", help="handle a sign-up/removal GitHub issue event (used by signup.yml)")
+    iss.add_argument("event", help="path to the GitHub event JSON")
+    iss.add_argument("--out", default="issue-result.json")
     args = p.parse_args(argv)
     cfg = load_config()
     for k in ("db_path", "raw_dir", "site_dir", "history_db"):
         cfg[k] = ROOT / cfg[k]
     cmds = {"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label,
-            "history": cmd_history, "profile-from-company": cmd_profile_from_company}
+            "history": cmd_history, "profile-from-company": cmd_profile_from_company, "issue": cmd_issue}
     sys.exit(cmds[args.cmd](cfg, args))
 
 
