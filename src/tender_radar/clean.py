@@ -13,7 +13,7 @@ EUR_PER_UNIT = {
 COLUMNS = [
     "id", "title", "title_en", "description", "buyer", "country", "cpv",
     "value", "currency", "value_eur", "published", "deadline", "link", "notice_type",
-    "main_cpv", "cpv_label", "title_english",
+    "main_cpv", "cpv_label", "title_english", "procedure_id",
 ]
 
 
@@ -101,6 +101,7 @@ def clean(n: dict) -> dict:
         "main_cpv": main,
         "cpv_label": parts[1] if len(parts) == 3 else None,
         "title_english": eng,  # genuine English title, only ~8% of notices
+        "procedure_id": n.get("procedure-identifier"),  # shared with the award notice (eForms only)
     }
 
 

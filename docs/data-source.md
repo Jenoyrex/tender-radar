@@ -93,6 +93,34 @@ tenders (`match.cpv_label_map`).
 3. **Volume.** CPV 72, all EU, 60 days: ~10,200 notices, ~5,400 of them
    `form-type=competition` → 22 pages of 250 → a full backfill takes about a minute.
 
+## Contract award notices (`form-type=result`)
+
+Used for the backtest in [evaluation.md](evaluation.md): a company's past wins
+become its profile. Same endpoint and paging; only the query (`form-type=result`)
+and field list (`ted.AWARD_FIELDS`) differ. TED returns the full list of 1,830
+valid field names if you ask for an unknown one.
+
+| Need | Field | Shape (example) | Notes |
+|---|---|---|---|
+| Winner name | `winner-name` | `{"pol": ["Esri Polska Sp. z o.o."]}` | Language → list. Occasionally the same names in 2 languages. Same values as `organisation-name-tenderer` in the sample. |
+| Winner national ID | `winner-identifier` | `["6762499389"]` | Free text: VAT, company register, tax number, with or without country prefix and punctuation. **One per tenderer, not per winner**: equals `organisation-identifier-tenderer` in 150/150 sampled notices, and 39 of 150 have a different number of IDs than names (e.g. 1 winner, 2 IDs). |
+| Winner country | `winner-country` | `["POL"]` | Same per-tenderer alignment caveat. |
+| Winner size | `winner-size` | `["sme"]` | `micro` / `small` / `sme` / `large`; 130/150. |
+| Award date | `winner-decision-date` | `["2026-09-04+02:00"]` | Only 75/150. `contract-conclusion-date` (133/150) is the signing date. `publication-date` is always there. |
+| Value | `result-value-notice` + `-cur-notice` | `"890040"`, `"PLN"` | Total awarded value, 107/150. Per lot: `result-value-lot`, 33/150; winning tender: `tender-value`, 123/150. |
+| Link to the original notice | `procedure-identifier` | `"76124ea5-f376-…"` | eForms procedure UUID, on **150/150** award notices and shared by the procedure's contract notice. In a 40-notice test, 29 awards (73%) found their `competition` notice this way. |
+| | `previous-notice-id-proc` | `["436987-2026"]` | Explicit publication number of the earlier notice, but only on 57/150 (38%); every one of those also linked via `procedure-identifier`. |
+
+Sample: all 150 CPV-72 award notices published 2026-10-01 to 10-03 (149 `can-standard`, 1 `can-social`).
+
+- **Have a winner:** 136/150 (91%). The rest are unsuccessful or cancelled procedures.
+- **Usable link back:** ~73% via `procedure-identifier` (the original notice may be
+  older than our history, or be a pre-eForms/national notice).
+- **Pairing names with IDs:** only safe when the counts match, so `awards.clean_award`
+  keeps the ID only then and otherwise falls back to the name.
+
+Full two-year numbers are in [evaluation.md](evaluation.md) (`tender-radar history` prints them).
+
 ## Licence and attribution
 
 TED content may be reused with attribution (Commission Decision 2011/833/EU on
