@@ -1,0 +1,15 @@
+name: End-to-end test of the self-serve sign-up (will be…
+description: End-to-end test of the self-serve sign-up (will be removed right after). We build accessible
+  public-sector websites and web portals on open-source CMS such as Drupal and WordPress, and host and
+  maintain them.
+countries:
+- ESP
+- PRT
+cpv: []
+exclude_keywords:
+- hardware
+- printers
+min_value_eur: 20000.0
+max_value_eur: 800000.0
+signup_issue: 1
+created: '2026-11-14'
