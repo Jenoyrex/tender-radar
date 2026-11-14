@@ -38,7 +38,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [x] **C5** README final (pitch, live link, screenshot, diagram, headline, sign-up, local run, attribution, limitations, licence).
   Check: read README against this list; image file exists.
 - [x] **C6** docs/WRITEUP.md, 600–900 words, honest. Check: word count; read it.
-- [ ] **C7** v1.0.0 release with notes. Check: `gh release view v1.0.0`.
+- [x] **C7** v1.0.0 release with notes. Check: `gh release view v1.0.0`.
 
 ## D. Robustness (added 2026-11-14)
 - [x] **D1** Non-destructive schema changes: `db.connect` never drops a table with data (ALTER TABLE ADD COLUMN);
