@@ -57,7 +57,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
   Check: `--variant europe` prints hit@10/50 for shipped vs baselines with bootstrap CI.
 - [x] **E3** Cold start: profile from the single most recent earlier win (closest proxy for a newcomer's short
   description). Check: `--variant one-win` prints results; tests.
-- [ ] **E4** evaluation.md, README, home page and WRITEUP report E1–E3 honestly (WRITEUP stays 600–900 words).
+- [x] **E4** evaluation.md, README, home page and WRITEUP report E1–E3 honestly (WRITEUP stays 600–900 words).
   Check: read; links checker; word count.
 - [ ] **E5** Final audit of A–E from a clean clone; release v1.1.0. Check: all checks re-run; `gh release view v1.1.0`.
 
