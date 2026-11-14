@@ -51,19 +51,23 @@ def methods(tenders, emb_cache):
     proxy's answer; their proxy scores are not comparable and are shown for completeness.
     """
     from sklearn.feature_extraction.text import TfidfVectorizer
+
     labels = match.cpv_label_map(tenders)
     native = [match.tender_text(t) for t in tenders]
     english = [match.english_text(t, labels) for t in tenders]
     out = {}
-    for name, docs, kw in (("TF-IDF words (baseline)", native, dict(strip_accents="unicode")),
-                           ("TF-IDF char 3-5 grams (current)", native, dict(analyzer="char_wb", ngram_range=(3, 5))),
-                           ("TF-IDF English title + CPV labels (sees CPV)", english, dict(strip_accents="unicode"))):
+    for name, docs, kw in (
+        ("TF-IDF words (baseline)", native, dict(strip_accents="unicode")),
+        ("TF-IDF char 3-5 grams (current)", native, dict(analyzer="char_wb", ngram_range=(3, 5))),
+        ("TF-IDF English title + CPV labels (sees CPV)", english, dict(strip_accents="unicode")),
+    ):
         vec = TfidfVectorizer(sublinear_tf=True, min_df=2, max_df=0.5, **kw).fit(docs)
         m = vec.transform(docs)
 
         def score(q, picked, cand, vec=vec, m=m, docs=docs):
             q = " ".join(docs[i][:600] for i in picked) if picked else q
             return (m[cand] @ vec.transform([q]).T).toarray().ravel()
+
         out[name] = score
     for name, cache in emb_cache.items():
         v = np.stack([cache[t["id"]] for t in tenders])
@@ -72,11 +76,14 @@ def methods(tenders, emb_cache):
         def score(q, picked, cand, v=v, name=name, e5=e5):
             qv = v[picked].mean(0) if picked else match.embed([q], name, "query: " if e5 else "")[0]
             return v[cand] @ (qv / np.linalg.norm(qv))
+
         out["e5-small, English title + description (sees CPV)" if e5 else f"Embeddings: {name}"] = score
     char, e5name = "TF-IDF char 3-5 grams (current)", "e5-small, English title + description (sees CPV)"
     if e5name in out:
         z = lambda x: (x - x.mean()) / (x.std() or 1)
-        out["Blend 0.5 char-TF-IDF + 0.5 e5 (sees CPV)"] = lambda q, p, c: 0.5 * z(out[char](q, p, c)) + 0.5 * z(out[e5name](q, p, c))
+        out["Blend 0.5 char-TF-IDF + 0.5 e5 (sees CPV)"] = lambda q, p, c: (
+            0.5 * z(out[char](q, p, c)) + 0.5 * z(out[e5name](q, p, c))
+        )
     return out
 
 
@@ -101,21 +108,30 @@ def run(tenders: list[dict], emb_cache: dict) -> dict:
                     acc = res[setting].setdefault(mname, {}).setdefault(g, {k: [] for k in KS})
                     for k in KS:
                         acc[k].append(pk[k])
-    return {s: {m: {g: {k: statistics.mean(v) for k, v in d.items()} for g, d in gs.items()} for m, gs in ms_.items()} for s, ms_ in res.items()}
+    return {
+        s: {m: {g: {k: statistics.mean(v) for k, v in d.items()} for g, d in gs.items()} for m, gs in ms_.items()}
+        for s, ms_ in res.items()
+    }
 
 
 def to_markdown(res: dict, n_tenders: int) -> str:
     lines = []
-    for setting, title in (("sample", "A. Profile built from 10 sampled tenders of the group"),
-                           ("short", "B. Profile = one-line English business description")):
+    for setting, title in (
+        ("sample", "A. Profile built from 10 sampled tenders of the group"),
+        ("short", "B. Profile = one-line English business description"),
+    ):
         lines += [f"### {title}", "", "| Method | P@10 | P@50 |", "|---|---|---|"]
         for m, gs in res[setting].items():
             p10 = statistics.mean(v[10] for v in gs.values())
             p50 = statistics.mean(v[50] for v in gs.values())
             lines.append(f"| {m} | {p10:.2f} | {p50:.2f} |")
         lines.append("")
-    lines += ["### Per group, setting B, P@10", "", "| Group | " + " | ".join(res["short"]) + " |",
-              "|---" * (len(res["short"]) + 1) + "|"]
+    lines += [
+        "### Per group, setting B, P@10",
+        "",
+        "| Group | " + " | ".join(res["short"]) + " |",
+        "|---" * (len(res["short"]) + 1) + "|",
+    ]
     for g in GROUPS:
         lines.append(f"| {g} | " + " | ".join(f"{gs[g][10]:.2f}" for gs in res["short"].values()) + " |")
     return "\n".join(lines) + f"\n\n_{n_tenders} tenders, {len(GROUPS)} CPV groups, {len(SEEDS)} seeds for setting A._\n"
@@ -124,6 +140,7 @@ def to_markdown(res: dict, n_tenders: int) -> str:
 def main(tenders: list[dict], data_dir: Path, models: list[str]) -> str:
     emb = {m: match.cached_embeddings(tenders, Path(data_dir) / f"emb-{m}.npz", m) for m in models if m != match.E5_MODEL}
     if match.E5_MODEL in models:
-        emb[match.E5_MODEL] = match.cached_embeddings(tenders, Path(data_dir) / "emb-e5-small.npz", match.E5_MODEL,
-                                                      text_fn=match.e5_text, prefix="passage: ")
+        emb[match.E5_MODEL] = match.cached_embeddings(
+            tenders, Path(data_dir) / "emb-e5-small.npz", match.E5_MODEL, text_fn=match.e5_text, prefix="passage: "
+        )
     return to_markdown(run(tenders, emb), len(tenders))

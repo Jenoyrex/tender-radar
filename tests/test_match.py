@@ -5,16 +5,37 @@ from tender_radar import build, match
 TODAY = dt.date(2026, 11, 13)
 
 
-def t(id, title, desc="", country="DEU", cpv="72000000", value_eur=None, deadline="2026-12-01", buyer="B", published="2026-11-01"):
-    return dict(id=id, title=title, title_en=title, description=desc, buyer=buyer, country=country, cpv=cpv,
-                value=value_eur, currency="EUR" if value_eur else None, value_eur=value_eur,
-                published=published, deadline=deadline, link=f"https://ted.europa.eu/en/notice/-/detail/{id}",
-                notice_type="cn-standard")
+def t(
+    id, title, desc="", country="DEU", cpv="72000000", value_eur=None, deadline="2026-12-01", buyer="B", published="2026-11-01"
+):
+    return dict(
+        id=id,
+        title=title,
+        title_en=title,
+        description=desc,
+        buyer=buyer,
+        country=country,
+        cpv=cpv,
+        value=value_eur,
+        currency="EUR" if value_eur else None,
+        value_eur=value_eur,
+        published=published,
+        deadline=deadline,
+        link=f"https://ted.europa.eu/en/notice/-/detail/{id}",
+        notice_type="cn-standard",
+    )
 
 
-P = match.Profile(slug="p", name="P", description="cloud data warehouse dashboards analytics",
-                  countries=["DEU", "AUT"], cpv=["7231"], min_value_eur=10_000, max_value_eur=1_000_000,
-                  exclude_keywords=["printer"])
+P = match.Profile(
+    slug="p",
+    name="P",
+    description="cloud data warehouse dashboards analytics",
+    countries=["DEU", "AUT"],
+    cpv=["7231"],
+    min_value_eur=10_000,
+    max_value_eur=1_000_000,
+    exclude_keywords=["printer"],
+)
 
 
 def test_filters():
@@ -29,8 +50,13 @@ def test_filters():
 
 
 def test_rank_orders_by_similarity_and_explains():
-    ts = [t("1", "office furniture"), t("2", "data warehouse and analytics dashboards"),
-          t("3", "road maintenance"), t("4", "furniture repair"), t("5", "data analytics platform")]
+    ts = [
+        t("1", "office furniture"),
+        t("2", "data warehouse and analytics dashboards"),
+        t("3", "road maintenance"),
+        t("4", "furniture repair"),
+        t("5", "data analytics platform"),
+    ]
     res = match.rank(ts, P, today=TODAY)
     assert res[0]["id"] == "2"
     assert any(r.startswith("shared words:") and "warehouse" in r for r in res[0]["reasons"])
@@ -65,11 +91,12 @@ def test_build_writes_pages(tmp_path):
     assert "<rss" in (tmp_path / "site" / "p" / "x.xml").read_text(encoding="utf-8")
     index = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
     assert "European Union" in index
-    assert index.count("<tr><td><a href=\"https://ted") == 2 and "data analytics &lt;b&gt;" in index  # rows present without JS
+    assert index.count('<tr><td><a href="https://ted') == 2 and "data analytics &lt;b&gt;" in index  # rows present without JS
 
 
 def test_feedback_links(tmp_path):
     from urllib.parse import parse_qs, urlparse
+
     r = dict(t("753867-2026", "IT <x>"), score=0.4, reasons=["r"])
     u = urlparse(build.feedback_url(r, "data-analytics-dach", "not relevant"))
     q = parse_qs(u.query)

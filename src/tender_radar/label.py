@@ -34,8 +34,9 @@ def candidate_rankers(cands: list[dict], p: match.Profile, data_dir: Path, all_t
         "char-tfidf": match.tfidf_similarity(p.description, [match.tender_text(t) for t in cands]),
         "english-tfidf": match.tfidf_similarity(p.description, [match.english_text(t, labels) for t in cands], analyzer="word"),
     }
-    vecs = match.cached_embeddings(all_tenders, Path(data_dir) / "emb-e5-small.npz", match.E5_MODEL,
-                                   text_fn=match.e5_text, prefix="passage: ")
+    vecs = match.cached_embeddings(
+        all_tenders, Path(data_dir) / "emb-e5-small.npz", match.E5_MODEL, text_fn=match.e5_text, prefix="passage: "
+    )
     q = match.embed([p.description], match.E5_MODEL, prefix="query: ")[0]
     out["e5"] = np.stack([vecs[t["id"]] for t in cands]) @ q
     return out
@@ -79,8 +80,12 @@ def load_snapshot(path: Path) -> tuple[dt.date, list[dict]]:
 def show(p: match.Profile, t: dict, labels: dict, n: int, total: int) -> None:
     w = lambda s, ind="  ": textwrap.fill(s, 100, initial_indent=ind, subsequent_indent=" " * len(ind))
     cpvs = [f"{c} {labels.get(c, '')}".strip() for c in (t["cpv"] or "").split()]
-    value = "not published" if t["value"] is None else f"{t['value']:,.0f} {t['currency']}" + (
-        f" (≈ €{t['value_eur']:,.0f})" if t["value_eur"] and t["currency"] != "EUR" else "")
+    value = (
+        "not published"
+        if t["value"] is None
+        else f"{t['value']:,.0f} {t['currency']}"
+        + (f" (≈ €{t['value_eur']:,.0f})" if t["value_eur"] and t["currency"] != "EUR" else "")
+    )
     print("\n" + "=" * 100)
     print(f"[{n}/{total}]  PROFILE: {p.name}")
     print(w(p.description))
@@ -113,12 +118,22 @@ def run(tenders: list[dict], profiles_dir: Path, queue_path: Path, labels_path: 
             w.writeheader()
         for i, q in enumerate(todo, len(done) + 1):
             show(profiles[q["profile"]], by_id[q["tender_id"]], labels_map, i, len(queue))
-            while (k := input("  Is this a tender this business would want to bid on? [r/n/u/s/q] ").strip().lower()) not in (*KEYS, "s", "q"):
+            while (k := input("  Is this a tender this business would want to bid on? [r/n/u/s/q] ").strip().lower()) not in (
+                *KEYS,
+                "s",
+                "q",
+            ):
                 pass
             if k == "q":
                 break
             if k in KEYS:
-                w.writerow({"profile": q["profile"], "tender_id": q["tender_id"], "label": KEYS[k],
-                            "labelled_at": dt.datetime.now().isoformat(timespec="seconds")})
+                w.writerow(
+                    {
+                        "profile": q["profile"],
+                        "tender_id": q["tender_id"],
+                        "label": KEYS[k],
+                        "labelled_at": dt.datetime.now().isoformat(timespec="seconds"),
+                    }
+                )
                 f.flush()  # never lose a judgement
     print(f"Saved to {labels_path}")

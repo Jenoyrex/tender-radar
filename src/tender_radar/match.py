@@ -65,6 +65,7 @@ def e5_text(t: dict) -> str:
 
 # ---- similarity models -------------------------------------------------------
 
+
 def tfidf_similarity(query: str, docs: list[str], analyzer: str = "char_wb") -> np.ndarray:
     big = len(docs) >= 50  # document-frequency cut-offs only make sense on a real corpus
     df = dict(min_df=2, max_df=0.5) if big else {}
@@ -85,19 +86,23 @@ _models = {}
 def embed(texts: list[str], model_name: str = EMBED_MODEL, prefix: str = "") -> np.ndarray:
     """prefix: e5 models expect "query: " / "passage: "."""
     from sentence_transformers import SentenceTransformer  # optional dependency
+
     if model_name not in _models:
         _models[model_name] = SentenceTransformer(model_name, device="cpu")
-    return _models[model_name].encode([prefix + x for x in texts], batch_size=64, normalize_embeddings=True, show_progress_bar=False)
+    return _models[model_name].encode(
+        [prefix + x for x in texts], batch_size=64, normalize_embeddings=True, show_progress_bar=False
+    )
 
 
-def cached_embeddings(tenders: list[dict], path: Path, model_name: str = EMBED_MODEL,
-                      text_fn=tender_text, prefix: str = "") -> dict:
+def cached_embeddings(
+    tenders: list[dict], path: Path, model_name: str = EMBED_MODEL, text_fn=tender_text, prefix: str = ""
+) -> dict:
     """{id: vector}, embedding only tenders not already in the .npz cache at `path`."""
     path = Path(path)
     cache = dict(np.load(path)) if path.exists() else {}
     missing = [t for t in tenders if t["id"] not in cache]
     if missing:
-        cache |= dict(zip((t["id"] for t in missing), embed([text_fn(t) for t in missing], model_name, prefix)))
+        cache |= dict(zip((t["id"] for t in missing), embed([text_fn(t) for t in missing], model_name, prefix), strict=True))
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(path, **cache)  # ponytail: never pruned; ~1.5 KB per notice
     return cache
@@ -110,6 +115,7 @@ def embedding_similarity(query: str, docs: list[str], model_name: str = EMBED_MO
 
 
 # ---- filters and explanations ------------------------------------------------
+
 
 def passes_filters(t: dict, p: Profile, today: dt.date) -> bool:
     if t["deadline"] and t["deadline"] < today.isoformat():
@@ -149,8 +155,14 @@ def reasons(t: dict, p: Profile, sim: float) -> list[str]:
     return out
 
 
-def rank(tenders: list[dict], p: Profile, method: str = "tfidf", today: dt.date | None = None,
-         top: int = 50, doc_vecs: dict | None = None) -> list[dict]:
+def rank(
+    tenders: list[dict],
+    p: Profile,
+    method: str = "tfidf",
+    today: dt.date | None = None,
+    top: int = 50,
+    doc_vecs: dict | None = None,
+) -> list[dict]:
     """Return the top tenders for a profile, each with 'score' and 'reasons'."""
     today = today or dt.date.today()
     cands = [t for t in tenders if passes_filters(t, p, today)]

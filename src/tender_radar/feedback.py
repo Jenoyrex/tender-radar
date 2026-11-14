@@ -15,15 +15,19 @@ import urllib.request
 from pathlib import Path
 
 COLUMNS = ["issue", "created", "verdict", "profile", "tender", "score"]
-LINE = re.compile(r"feedback:\s*(relevant|not relevant)\s*\|\s*profile:\s*([\w-]+)\s*\|\s*tender:\s*(\d+-\d{4})"
-                  r"\s*\|\s*score:\s*([\d.]+)")
+LINE = re.compile(
+    r"feedback:\s*(relevant|not relevant)\s*\|\s*profile:\s*([\w-]+)\s*\|\s*tender:\s*(\d+-\d{4})"
+    r"\s*\|\s*score:\s*([\d.]+)"
+)
 
 
 def github_get(path: str, repo: str | None = None):
     """GET from the GitHub REST API, authenticated when GITHUB_TOKEN is set."""
     repo = repo or os.environ.get("GITHUB_REPOSITORY", "Jenoyrex/tender-radar")
-    req = urllib.request.Request(f"https://api.github.com/repos/{repo}/{path}",
-                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "tender-radar"})
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/{path}",
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "tender-radar"},
+    )
     if os.environ.get("GITHUB_TOKEN"):
         req.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -37,8 +41,14 @@ def parse(issue: dict) -> dict | None:
     m = LINE.search((issue.get("body") or "").split("\n", 1)[0])
     if not m:
         return None
-    return {"issue": issue["number"], "created": issue["created_at"][:10], "verdict": m.group(1),
-            "profile": m.group(2), "tender": m.group(3), "score": float(m.group(4))}
+    return {
+        "issue": issue["number"],
+        "created": issue["created_at"][:10],
+        "verdict": m.group(1),
+        "profile": m.group(2),
+        "tender": m.group(3),
+        "score": float(m.group(4)),
+    }
 
 
 def fetch_all(get=github_get) -> list[dict]:

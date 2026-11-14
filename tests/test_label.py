@@ -2,9 +2,9 @@ import csv
 import datetime as dt
 
 import numpy as np
+from test_match import t
 
 from tender_radar import label
-from test_match import t
 
 TODAY = dt.date(2026, 11, 13)
 
@@ -13,8 +13,15 @@ def test_queue_pools_models_and_samples_random(tmp_path, monkeypatch):
     (tmp_path / "x.yaml").write_text("name: X\ndescription: data\n")
     tenders = [t(str(i), f"tender {i}", buyer=f"b{i}") for i in range(200)]
     # three fake models with different rankings
-    monkeypatch.setattr(label, "candidate_rankers", lambda cands, *a: {
-        "a": np.arange(len(cands), 0, -1.0), "b": np.arange(len(cands), dtype=float), "c": np.ones(len(cands))})
+    monkeypatch.setattr(
+        label,
+        "candidate_rankers",
+        lambda cands, *a: {
+            "a": np.arange(len(cands), 0, -1.0),
+            "b": np.arange(len(cands), dtype=float),
+            "c": np.ones(len(cands)),
+        },
+    )
     queue, open_ = label.make_queue(tenders, tmp_path, tmp_path, TODAY)
     assert len(queue) == label.PER_PROFILE == len({q["tender_id"] for q in queue})
     pool = {q["tender_id"] for q in queue if q["source"] == "pool"}

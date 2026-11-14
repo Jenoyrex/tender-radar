@@ -6,14 +6,38 @@ import re
 # Only used for the value filter; the original value + currency are always kept.
 # Upgrade path: fetch the ECB daily reference rates.
 EUR_PER_UNIT = {
-    "EUR": 1.0, "BGN": 0.511, "CZK": 0.040, "DKK": 0.134, "HUF": 0.0025,
-    "PLN": 0.235, "RON": 0.197, "SEK": 0.091, "NOK": 0.085, "CHF": 1.06,
-    "ISK": 0.0071, "GBP": 1.17,
+    "EUR": 1.0,
+    "BGN": 0.511,
+    "CZK": 0.040,
+    "DKK": 0.134,
+    "HUF": 0.0025,
+    "PLN": 0.235,
+    "RON": 0.197,
+    "SEK": 0.091,
+    "NOK": 0.085,
+    "CHF": 1.06,
+    "ISK": 0.0071,
+    "GBP": 1.17,
 }
 COLUMNS = [
-    "id", "title", "title_en", "description", "buyer", "country", "cpv",
-    "value", "currency", "value_eur", "published", "deadline", "link", "notice_type",
-    "main_cpv", "cpv_label", "title_english", "procedure_id",
+    "id",
+    "title",
+    "title_en",
+    "description",
+    "buyer",
+    "country",
+    "cpv",
+    "value",
+    "currency",
+    "value_eur",
+    "published",
+    "deadline",
+    "link",
+    "notice_type",
+    "main_cpv",
+    "cpv_label",
+    "title_english",
+    "procedure_id",
 ]
 
 

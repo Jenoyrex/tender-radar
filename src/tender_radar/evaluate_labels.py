@@ -86,14 +86,19 @@ def run(data_dir: Path, profiles_dir: Path) -> dict:
                 for lenient in (False, True):
                     for k in KS:
                         res.setdefault((part, lenient), {}).setdefault(name, {}).setdefault(k, []).append(
-                            precision(ranked, judged, k, lenient))
+                            precision(ranked, judged, k, lenient)
+                        )
                     if name == "char-tfidf":
                         rel = [1.0 if v == "relevant" else (0.5 if lenient and v == "unsure" else 0.0) for v in judged.values()]
                         base.setdefault((part, lenient), []).append(sum(rel) / len(rel))
     mean = {key: {m: {k: float(np.mean(v)) for k, v in ks.items()} for m, ks in d.items()} for key, d in res.items()}
-    return {"precision": mean, "base": {k: float(np.mean(v)) for k, v in base.items()},
-            "n_judged": len(parts), "n_relevant": sum(v == "relevant" for v in labels.values()),
-            "n_unsure": sum(v == "unsure" for v in labels.values())}
+    return {
+        "precision": mean,
+        "base": {k: float(np.mean(v)) for k, v in base.items()},
+        "n_judged": len(parts),
+        "n_relevant": sum(v == "relevant" for v in labels.values()),
+        "n_unsure": sum(v == "unsure" for v in labels.values()),
+    }
 
 
 def choose(res: dict) -> tuple[str, str]:
@@ -108,18 +113,29 @@ def choose(res: dict) -> tuple[str, str]:
 def to_markdown(res: dict) -> str:
     blend, chosen = choose(res)
     models = ["char-tfidf", "english-tfidf", "e5", blend]
-    names = {"char-tfidf": "Char 3-5-gram TF-IDF (current)", "english-tfidf": "TF-IDF on English title + CPV labels",
-             "e5": "multilingual-e5-small on English title + description", blend: f"Blend: w × char-TF-IDF + (1−w) × e5, {blend.split()[1]} picked on dev"}
+    names = {
+        "char-tfidf": "Char 3-5-gram TF-IDF (current)",
+        "english-tfidf": "TF-IDF on English title + CPV labels",
+        "e5": "multilingual-e5-small on English title + description",
+        blend: f"Blend: w × char-TF-IDF + (1−w) × e5, {blend.split()[1]} picked on dev",
+    }
     out = []
     for part in ("dev", "test"):
-        out += [f"#### {part.upper()} half", "", "| Model | P@10 strict | P@20 strict | P@10 lenient | P@20 lenient |", "|---|---|---|---|---|"]
+        out += [
+            f"#### {part.upper()} half",
+            "",
+            "| Model | P@10 strict | P@20 strict | P@10 lenient | P@20 lenient |",
+            "|---|---|---|---|---|",
+        ]
         b, bl = res["base"][(part, False)], res["base"][(part, True)]
         out.append(f"| Share relevant among judged (random baseline) | {b:.2f} | {b:.2f} | {bl:.2f} | {bl:.2f} |")
         for m in models:
-            s, l = res["precision"][(part, False)][m], res["precision"][(part, True)][m]
+            s, le = res["precision"][(part, False)][m], res["precision"][(part, True)][m]
             mark = " ← chosen on dev" if m == chosen and part == "dev" else ""
-            out.append(f"| {names[m]}{mark} | {s[10]:.2f} | {s[20]:.2f} | {l[10]:.2f} | {l[20]:.2f} |")
+            out.append(f"| {names[m]}{mark} | {s[10]:.2f} | {s[20]:.2f} | {le[10]:.2f} | {le[20]:.2f} |")
         out.append("")
-    out.append(f"_{res['n_judged']} judged pairs ({res['n_relevant']} relevant, {res['n_unsure']} unsure), "
-               "3 profiles, ~25 judged pairs per profile per half._")
+    out.append(
+        f"_{res['n_judged']} judged pairs ({res['n_relevant']} relevant, {res['n_unsure']} unsure), "
+        "3 profiles, ~25 judged pairs per profile per half._"
+    )
     return "\n".join(out) + "\n"

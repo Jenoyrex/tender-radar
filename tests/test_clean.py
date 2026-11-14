@@ -1,4 +1,5 @@
 import copy
+import datetime as dt
 import json
 from pathlib import Path
 
@@ -7,7 +8,6 @@ import pytest
 from tender_radar import db
 from tender_radar.clean import SchemaError, clean, clean_all
 from tender_radar.ted import build_query
-import datetime as dt
 
 RAW = json.loads((Path(__file__).parent / "fixtures" / "search_page.json").read_text(encoding="utf-8"))
 
@@ -56,14 +56,17 @@ def test_dedup_on_id():
     assert len(clean_all([RAW[0], copy.deepcopy(RAW[0])])) == 1
 
 
-@pytest.mark.parametrize("field,bad", [
-    ("publication-number", None),
-    ("publication-number", "not-an-id"),
-    ("classification-cpv", "72000000"),
-    ("classification-cpv", ["72x"]),
-    ("publication-date", "yesterday"),
-    ("title-proc", "plain string"),
-])
+@pytest.mark.parametrize(
+    "field,bad",
+    [
+        ("publication-number", None),
+        ("publication-number", "not-an-id"),
+        ("classification-cpv", "72000000"),
+        ("classification-cpv", ["72x"]),
+        ("publication-date", "yesterday"),
+        ("title-proc", "plain string"),
+    ],
+)
 def test_schema_change_fails_loudly(field, bad):
     n = copy.deepcopy(RAW[0])
     n[field] = bad
@@ -81,7 +84,10 @@ def test_db_upsert_dedupes(tmp_path):
 
 def test_build_query():
     q = build_query(dt.date(2026, 11, 2), ["72", "48"], ["DEU"])
-    assert q == "PD=20261102 AND form-type=competition AND (classification-cpv=72* OR classification-cpv=48*) AND buyer-country IN (DEU)"
+    assert (
+        q
+        == "PD=20261102 AND form-type=competition AND (classification-cpv=72* OR classification-cpv=48*) AND buyer-country IN (DEU)"
+    )
 
 
 def test_english_fields():

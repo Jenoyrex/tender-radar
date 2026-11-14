@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 from . import build, clean, db, match, ted
-from .config import ROOT, load as load_config
+from .config import ROOT
+from .config import load as load_config
 
 log = logging.getLogger("tender_radar")
 
@@ -52,8 +53,10 @@ def cmd_build(cfg, args):
 
 def cmd_evaluate(cfg, args):
     from . import evaluate
+
     if args.labels:
         from . import evaluate_labels
+
         print(evaluate_labels.to_markdown(evaluate_labels.run(Path(cfg["db_path"]).parent, ROOT / "profiles")))
         return 0
     tenders = db.load(db.connect(cfg["db_path"]))
@@ -74,6 +77,7 @@ def _load_days(raw_dir, start, end, kind):
 def cmd_history(cfg, args):
     """Backfill award + competition notices for the backtest into history_db, then resolve winners."""
     from . import awards
+
     end = dt.date.today()
     a_start = end - dt.timedelta(days=cfg["history_days"])
     c_start = a_start - dt.timedelta(days=cfg["history_lead_days"])
@@ -96,6 +100,7 @@ def cmd_history(cfg, args):
 
 def cmd_profile_from_company(cfg, args):
     from . import company
+
     try:
         prof = company.make_profile(args.name, company.own_wins(args.name, company.search(args.name, cfg)))
     except ValueError as e:
@@ -114,11 +119,13 @@ def cmd_profile_from_company(cfg, args):
 
 def _github(path: str):
     from .feedback import github_get
+
     return github_get(path)
 
 
 def cmd_feedback(cfg, args):
     from . import feedback
+
     rows = feedback.fetch_all()
     feedback.write(rows, ROOT / "data" / "feedback.csv")
     print(feedback.report(rows))
@@ -133,6 +140,7 @@ def cmd_issue(cfg, args):
     import yaml
 
     from . import company, signup
+
     issue = json.loads(Path(args.event).read_text(encoding="utf-8"))["issue"]
     labels = {lb["name"] for lb in issue.get("labels", [])}
     profiles = ROOT / "profiles"
@@ -149,11 +157,17 @@ def cmd_issue(cfg, args):
             if not signup.may_remove(issue, path, author):
                 raise signup.Rejected(f"Only the person who opened sign-up issue #{n} can remove this feed.")
             path.unlink()
-            res = {"action": "removed", "slug": path.stem,
-                   "comment": f"Removed the feed `{path.stem}`. Its page disappears with the next site build (a few minutes)."}
+            res = {
+                "action": "removed",
+                "slug": path.stem,
+                "comment": f"Removed the feed `{path.stem}`. Its page disappears with the next site build (a few minutes).",
+            }
     except signup.Rejected as e:
-        res = {"action": "rejected", "comment": f"Sorry, I couldn't process this request: {e}\n\n"
-                                                 "You're welcome to open a new issue with the form.", "slug": ""}
+        res = {
+            "action": "rejected",
+            "comment": f"Sorry, I couldn't process this request: {e}\n\nYou're welcome to open a new issue with the form.",
+            "slug": "",
+        }
     Path(args.out).write_text(json.dumps(res), encoding="utf-8")
     log.info("issue #%s: %s %s", issue.get("number"), res["action"], res["slug"])
     return 0
@@ -161,6 +175,7 @@ def cmd_issue(cfg, args):
 
 def cmd_label(cfg, args):
     from . import label
+
     data = Path(cfg["db_path"]).parent
     queue_path, snap_path, labels_path = data / "label-queue.csv", data / "label-snapshot.json.gz", data / "labels.csv"
     if args.make_queue:
@@ -207,9 +222,16 @@ def main(argv=None):
     cfg = load_config()
     for k in ("db_path", "raw_dir", "site_dir", "history_db"):
         cfg[k] = ROOT / cfg[k]
-    cmds = {"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label,
-            "history": cmd_history, "profile-from-company": cmd_profile_from_company, "issue": cmd_issue,
-            "feedback": cmd_feedback}
+    cmds = {
+        "update": cmd_update,
+        "build": cmd_build,
+        "evaluate": cmd_evaluate,
+        "label": cmd_label,
+        "history": cmd_history,
+        "profile-from-company": cmd_profile_from_company,
+        "issue": cmd_issue,
+        "feedback": cmd_feedback,
+    }
     sys.exit(cmds[args.cmd](cfg, args))
 
 

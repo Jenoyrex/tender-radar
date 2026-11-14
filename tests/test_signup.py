@@ -11,21 +11,40 @@ DESC = "We build and maintain websites and web portals on open-source CMS for pu
 
 
 def form(**fields):
-    labels = {"name": "Company name", "desc": "What does your business do?", "countries": "Countries",
-              "lo": "Minimum contract value (EUR)", "hi": "Maximum contract value (EUR)", "excl": "Words to exclude"}
+    labels = {
+        "name": "Company name",
+        "desc": "What does your business do?",
+        "countries": "Countries",
+        "lo": "Minimum contract value (EUR)",
+        "hi": "Maximum contract value (EUR)",
+        "excl": "Words to exclude",
+    }
     return "\n\n".join(f"### {labels[k]}\n\n{fields.get(k) or '_No response_'}" for k in labels)
 
 
 def issue(body, number=42, labels=("signup",), login="alice", assoc="NONE"):
-    return {"number": number, "body": body, "labels": [{"name": x} for x in labels],
-            "user": {"login": login}, "author_association": assoc}
+    return {
+        "number": number,
+        "body": body,
+        "labels": [{"name": x} for x in labels],
+        "user": {"login": login},
+        "author_association": assoc,
+    }
 
 
-NO_WINS = types.SimpleNamespace(search=lambda n, c: [], own_wins=lambda n, ns: [],
-                                make_profile=lambda n, w: (_ for _ in ()).throw(ValueError("none")))
-WINS = types.SimpleNamespace(search=lambda n, c: ["x"], own_wins=lambda n, ns: ns,
-                             make_profile=lambda n, w: {"name": f"{n} (from 7 past TED wins)", "description": "Wartung GIS",
-                                                        "countries": ["DEU"], "cpv": ["7222"]})
+NO_WINS = types.SimpleNamespace(
+    search=lambda n, c: [], own_wins=lambda n, ns: [], make_profile=lambda n, w: (_ for _ in ()).throw(ValueError("none"))
+)
+WINS = types.SimpleNamespace(
+    search=lambda n, c: ["x"],
+    own_wins=lambda n, ns: ns,
+    make_profile=lambda n, w: {
+        "name": f"{n} (from 7 past TED wins)",
+        "description": "Wartung GIS",
+        "countries": ["DEU"],
+        "cpv": ["7222"],
+    },
+)
 
 
 def test_parse_form_handles_no_response():
@@ -50,16 +69,19 @@ def test_signup_from_company_name_uses_past_wins(tmp_path):
     assert prof["countries"] == ["DEU"] and prof["cpv"] == ["7222"] and "7 past TED wins" in prof["name"]
 
 
-@pytest.mark.parametrize("body, reason", [
-    (form(), "company name"),
-    (form(desc="cheap seo"), "8+ words"),
-    (form(desc=DESC + " Visit https://spam.example now"), "links"),
-    (form(desc=DESC, countries="Narnia"), "Unknown country"),
-    (form(desc=DESC, lo="lots"), "whole number"),
-    (form(desc=DESC, lo="900000", hi="1000"), "larger than"),
-    (form(desc="word " * 400), "too long"),
-    (form(name="Nobody Ltd"), "no EU (TED)"),
-])
+@pytest.mark.parametrize(
+    "body, reason",
+    [
+        (form(), "company name"),
+        (form(desc="cheap seo"), "8+ words"),
+        (form(desc=DESC + " Visit https://spam.example now"), "links"),
+        (form(desc=DESC, countries="Narnia"), "Unknown country"),
+        (form(desc=DESC, lo="lots"), "whole number"),
+        (form(desc=DESC, lo="900000", hi="1000"), "larger than"),
+        (form(desc="word " * 400), "too long"),
+        (form(name="Nobody Ltd"), "no EU (TED)"),
+    ],
+)
 def test_invalid_or_spam_signups_are_rejected(tmp_path, body, reason):
     with pytest.raises(signup.Rejected, match=re.escape(reason)):
         signup.profile_from_issue(issue(body), tmp_path, {}, lookup=NO_WINS)
@@ -73,7 +95,9 @@ def test_signup_rejected_when_full(tmp_path, monkeypatch):
 
 
 def _profiles(tmp_path):
-    (tmp_path / "web-42.yaml").write_text(yaml.safe_dump({"name": "w", "description": DESC, "signup_issue": 42}), encoding="utf-8")
+    (tmp_path / "web-42.yaml").write_text(
+        yaml.safe_dump({"name": "w", "description": DESC, "signup_issue": 42}), encoding="utf-8"
+    )
     (tmp_path / "example.yaml").write_text(yaml.safe_dump({"name": "e", "description": DESC}), encoding="utf-8")
     return tmp_path
 
@@ -109,13 +133,25 @@ def test_issue_command_end_to_end(tmp_path, monkeypatch):
     assert f"/p/{res['slug']}.html" in res["comment"]
     # removal by a stranger is refused and keeps the file
     monkeypatch.setattr(cli, "_github", lambda path: {"user": {"login": "alice"}})
-    ev.write_text(json.dumps({"issue": issue(f"### Your feed page or sign-up issue number\n\n{res['slug']}",
-                                             43, ("remove-feed",), login="mallory")}), encoding="utf-8")
+    ev.write_text(
+        json.dumps(
+            {
+                "issue": issue(
+                    f"### Your feed page or sign-up issue number\n\n{res['slug']}", 43, ("remove-feed",), login="mallory"
+                )
+            }
+        ),
+        encoding="utf-8",
+    )
     cli.cmd_issue({}, types.SimpleNamespace(event=ev, out=out))
     assert json.loads(out.read_text())["action"] == "rejected"
     assert (tmp_path / "profiles" / f"{res['slug']}.yaml").exists()
-    ev.write_text(json.dumps({"issue": issue(f"### Your feed page or sign-up issue number\n\n{res['slug']}",
-                                             44, ("remove-feed",), login="alice")}), encoding="utf-8")
+    ev.write_text(
+        json.dumps(
+            {"issue": issue(f"### Your feed page or sign-up issue number\n\n{res['slug']}", 44, ("remove-feed",), login="alice")}
+        ),
+        encoding="utf-8",
+    )
     cli.cmd_issue({}, types.SimpleNamespace(event=ev, out=out))
     assert json.loads(out.read_text())["action"] == "removed"
     assert not (tmp_path / "profiles" / f"{res['slug']}.yaml").exists()

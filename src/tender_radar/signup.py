@@ -18,13 +18,38 @@ SIGNUP_LABEL, REMOVE_LABEL = "signup", "remove-feed"
 MAX_PROFILES = 300  # ponytail: keeps the daily build well inside free Actions minutes; raise if it ever fills up
 
 COUNTRIES = {  # TED buyer countries offered in the form: EU 27 + EEA + CH + UK
-    "AUT": "Austria", "BEL": "Belgium", "BGR": "Bulgaria", "HRV": "Croatia", "CYP": "Cyprus",
-    "CZE": "Czechia", "DNK": "Denmark", "EST": "Estonia", "FIN": "Finland", "FRA": "France",
-    "DEU": "Germany", "GRC": "Greece", "HUN": "Hungary", "IRL": "Ireland", "ITA": "Italy",
-    "LVA": "Latvia", "LTU": "Lithuania", "LUX": "Luxembourg", "MLT": "Malta", "NLD": "Netherlands",
-    "POL": "Poland", "PRT": "Portugal", "ROU": "Romania", "SVK": "Slovakia", "SVN": "Slovenia",
-    "ESP": "Spain", "SWE": "Sweden", "ISL": "Iceland", "LIE": "Liechtenstein", "NOR": "Norway",
-    "CHE": "Switzerland", "GBR": "United Kingdom",
+    "AUT": "Austria",
+    "BEL": "Belgium",
+    "BGR": "Bulgaria",
+    "HRV": "Croatia",
+    "CYP": "Cyprus",
+    "CZE": "Czechia",
+    "DNK": "Denmark",
+    "EST": "Estonia",
+    "FIN": "Finland",
+    "FRA": "France",
+    "DEU": "Germany",
+    "GRC": "Greece",
+    "HUN": "Hungary",
+    "IRL": "Ireland",
+    "ITA": "Italy",
+    "LVA": "Latvia",
+    "LTU": "Lithuania",
+    "LUX": "Luxembourg",
+    "MLT": "Malta",
+    "NLD": "Netherlands",
+    "POL": "Poland",
+    "PRT": "Portugal",
+    "ROU": "Romania",
+    "SVK": "Slovakia",
+    "SVN": "Slovenia",
+    "ESP": "Spain",
+    "SWE": "Sweden",
+    "ISL": "Iceland",
+    "LIE": "Liechtenstein",
+    "NOR": "Norway",
+    "CHE": "Switzerland",
+    "GBR": "United Kingdom",
 }
 URL_RE = re.compile(r"https?://|www\.|\[url|<a\s", re.I)
 
@@ -84,28 +109,43 @@ def profile_from_issue(issue: dict, profiles_dir: Path, cfg: dict, lookup=compan
     name = _clean_text(f.get("Company name", ""), "Company name", 120)
     desc = _clean_text(f.get("What does your business do?", ""), "What does your business do?", 1500)
     if desc and len(desc.split()) < 8:
-        raise Rejected("Please describe what you do in at least one full sentence (8+ words): "
-                       "the matcher compares these words with each tender.")
+        raise Rejected(
+            "Please describe what you do in at least one full sentence (8+ words): "
+            "the matcher compares these words with each tender."
+        )
     if not name and not desc:
         raise Rejected("Please give a company name (we look up its past EU contract wins) or describe what you do.")
     countries = _countries(f.get("Countries", ""))
-    lo, hi = _money(f.get("Minimum contract value (EUR)", ""), "Minimum value"), \
-        _money(f.get("Maximum contract value (EUR)", ""), "Maximum value")
+    lo, hi = (
+        _money(f.get("Minimum contract value (EUR)", ""), "Minimum value"),
+        _money(f.get("Maximum contract value (EUR)", ""), "Maximum value"),
+    )
     if lo and hi and lo > hi:
         raise Rejected("The minimum value is larger than the maximum value.")
-    excl = [w for w in (x.strip() for x in re.split(r"[,;\n]+", _clean_text(f.get("Words to exclude", ""), "Words to exclude", 300))) if w][:20]
+    excl = [
+        w
+        for w in (x.strip() for x in re.split(r"[,;\n]+", _clean_text(f.get("Words to exclude", ""), "Words to exclude", 300)))
+        if w
+    ][:20]
     if len(list(Path(profiles_dir).glob("*.yaml"))) >= MAX_PROFILES:
         raise Rejected("tender-radar is full right now (free hosting limits). Sorry; please try again later.")
 
-    prof = {"name": name or " ".join(desc.split()[:8]) + "…", "description": desc,
-            "countries": countries, "cpv": [], "exclude_keywords": excl}
+    prof = {
+        "name": name or " ".join(desc.split()[:8]) + "…",
+        "description": desc,
+        "countries": countries,
+        "cpv": [],
+        "exclude_keywords": excl,
+    }
     if name:
         try:
             past = lookup.make_profile(name, lookup.own_wins(name, lookup.search(name, cfg)))
         except ValueError:
             if not desc:
-                raise Rejected(f"We found no EU (TED) IT-services contracts won by {name!r}. "
-                               "Open a new sign-up and describe what you do instead.") from None
+                raise Rejected(
+                    f"We found no EU (TED) IT-services contracts won by {name!r}. "
+                    "Open a new sign-up and describe what you do instead."
+                ) from None
         else:
             prof["description"] = (desc + "\n" + past["description"]).strip()
             prof["cpv"] = past["cpv"]
@@ -146,9 +186,11 @@ def may_remove(issue: dict, profile: Path, signup_author: str | None) -> bool:
 
 def signup_reply(slug: str, prof: dict) -> str:
     page, feed = f"{SITE}/p/{slug}.html", f"{SITE}/p/{slug}.xml"
-    return (f"Your tender feed is ready.\n\n- Page: {page}\n- RSS feed: {feed}\n\n"
-            f"It updates every morning with open EU (TED) IT-services tenders ranked for: *{prof['name']}*. "
-            "The page can take a few minutes to appear after this comment.\n\n"
-            f"To remove it, open a [removal request](https://github.com/Jenoyrex/tender-radar/issues/new?template=remove.yml) "
-            f"with issue number {prof['signup_issue']}.\n\n"
-            "Data: TED, © European Union. tender-radar is unofficial; always read the official notice.")
+    return (
+        f"Your tender feed is ready.\n\n- Page: {page}\n- RSS feed: {feed}\n\n"
+        f"It updates every morning with open EU (TED) IT-services tenders ranked for: *{prof['name']}*. "
+        "The page can take a few minutes to appear after this comment.\n\n"
+        f"To remove it, open a [removal request](https://github.com/Jenoyrex/tender-radar/issues/new?template=remove.yml) "
+        f"with issue number {prof['signup_issue']}.\n\n"
+        "Data: TED, © European Union. tender-radar is unofficial; always read the official notice."
+    )

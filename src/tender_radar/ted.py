@@ -13,20 +13,49 @@ from pathlib import Path
 URL = "https://api.ted.europa.eu/v3/notices/search"
 PAGE_SIZE = 250  # API maximum
 FIELDS = [
-    "publication-number", "notice-type", "form-type", "notice-title", "title-proc",
-    "description-proc", "description-lot", "buyer-name", "buyer-country",
-    "classification-cpv", "publication-date", "deadline-receipt-tender-date-lot",
-    "deadline-receipt-request-date-lot", "estimated-value-proc",
-    "estimated-value-cur-proc", "estimated-value-lot", "estimated-value-cur-lot", "links",
-    "main-classification-proc", "procedure-identifier",
+    "publication-number",
+    "notice-type",
+    "form-type",
+    "notice-title",
+    "title-proc",
+    "description-proc",
+    "description-lot",
+    "buyer-name",
+    "buyer-country",
+    "classification-cpv",
+    "publication-date",
+    "deadline-receipt-tender-date-lot",
+    "deadline-receipt-request-date-lot",
+    "estimated-value-proc",
+    "estimated-value-cur-proc",
+    "estimated-value-lot",
+    "estimated-value-cur-lot",
+    "links",
+    "main-classification-proc",
+    "procedure-identifier",
 ]
 # Contract award notices (form-type=result); see docs/data-source.md for fill rates.
 AWARD_FIELDS = [
-    "publication-number", "notice-type", "notice-title", "title-proc", "description-proc",
-    "buyer-name", "buyer-country", "classification-cpv", "main-classification-proc",
-    "publication-date", "procedure-identifier", "previous-notice-id-proc",
-    "winner-name", "winner-identifier", "winner-country", "winner-size", "winner-decision-date",
-    "contract-conclusion-date", "result-value-notice", "result-value-cur-notice",
+    "publication-number",
+    "notice-type",
+    "notice-title",
+    "title-proc",
+    "description-proc",
+    "buyer-name",
+    "buyer-country",
+    "classification-cpv",
+    "main-classification-proc",
+    "publication-date",
+    "procedure-identifier",
+    "previous-notice-id-proc",
+    "winner-name",
+    "winner-identifier",
+    "winner-country",
+    "winner-size",
+    "winner-decision-date",
+    "contract-conclusion-date",
+    "result-value-notice",
+    "result-value-cur-notice",
 ]
 KIND_FIELDS = {"competition": FIELDS, "result": AWARD_FIELDS}
 log = logging.getLogger(__name__)
@@ -55,7 +84,8 @@ def _post(body: dict, user_agent: str, retries: int = 4) -> dict:
     data = json.dumps(body).encode()
     for attempt in range(retries):
         req = urllib.request.Request(
-            URL, data=data,
+            URL,
+            data=data,
             headers={"Content-Type": "application/json", "User-Agent": user_agent},
         )
         try:
@@ -100,8 +130,9 @@ def raw_path(raw_dir: Path, day: dt.date, kind: str = "competition") -> Path:
     return Path(raw_dir) / f"{prefix}{day.isoformat()}.{cache_tag(kind)}.json.gz"
 
 
-def collect(start: dt.date, end: dt.date, cfg: dict, refresh_days: int = 2,
-            kind: str = "competition") -> tuple[list[dt.date], list[dt.date]]:
+def collect(
+    start: dt.date, end: dt.date, cfg: dict, refresh_days: int = 2, kind: str = "competition"
+) -> tuple[list[dt.date], list[dt.date]]:
     """Fetch each day in [start, end] into the raw cache.
 
     Days already cached are skipped, except the last `refresh_days` (TED may

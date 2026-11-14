@@ -12,9 +12,11 @@ from xml.sax.saxutils import escape as xesc
 from . import match
 
 SITE_URL = "https://jenoyrex.github.io/tender-radar"
-ATTRIBUTION = ('Source: <a href="https://ted.europa.eu">TED – Tenders Electronic Daily</a>, '
-               '© European Union, Publications Office of the EU. Reused under Commission Decision 2011/833/EU. '
-               'tender-radar is unofficial and not affiliated with the EU. Always check the official notice.')
+ATTRIBUTION = (
+    'Source: <a href="https://ted.europa.eu">TED – Tenders Electronic Daily</a>, '
+    "© European Union, Publications Office of the EU. Reused under Commission Decision 2011/833/EU. "
+    "tender-radar is unofficial and not affiliated with the EU. Always check the official notice."
+)
 TOP_N = 30
 
 CSS = """
@@ -58,29 +60,39 @@ REPO = "https://github.com/Jenoyrex/tender-radar"
 
 def feedback_url(t, slug: str, verdict: str) -> str:
     """Prefilled GitHub issue. The first body line is machine-readable for later use as labels."""
-    body = (f"feedback: {verdict} | profile: {slug} | tender: {t['id']} | score: {t['score']:.3f}\n\n"
-            f"Tender: {t['title_en'] or t['title']}\n{t['link']}\n\n"
-            "Optional: why? (Please don't include personal data; issues are public.)\n")
+    body = (
+        f"feedback: {verdict} | profile: {slug} | tender: {t['id']} | score: {t['score']:.3f}\n\n"
+        f"Tender: {t['title_en'] or t['title']}\n{t['link']}\n\n"
+        "Optional: why? (Please don't include personal data; issues are public.)\n"
+    )
     q = urlencode({"title": f"[feedback] {verdict}: {slug} / {t['id']}", "body": body, "labels": "feedback"})
     return f"{REPO}/issues/new?{q}"
 
 
 def card(t, slug: str = "") -> str:
     chips = "".join(f"<li>{escape(r)}</li>" for r in t["reasons"])
-    fb = (f'<div class="fb">Useful match? <a href="{escape(feedback_url(t, slug, "relevant"))}" rel="nofollow">👍 relevant</a>'
-          f' · <a href="{escape(feedback_url(t, slug, "not relevant"))}" rel="nofollow">👎 not relevant</a></div>') if slug else ""
-    return f"""<div class="card"><span class="score" title="match score">{t['score']:.2f}</span>
-<h3><a href="{t['link']}">{escape(t['title_en'] or t['title'])}</a></h3>
-<div class="meta"><b>{escape(t['buyer'] or '?')}</b> · {t['country']} · value {money(t)} ·
-deadline <b>{t['deadline'] or 'see notice'}</b> · published {t['published']}</div><ul class="chips">{chips}</ul>{fb}</div>"""
+    fb = (
+        (
+            f'<div class="fb">Useful match? <a href="{escape(feedback_url(t, slug, "relevant"))}" rel="nofollow">👍 relevant</a>'
+            f' · <a href="{escape(feedback_url(t, slug, "not relevant"))}" rel="nofollow">👎 not relevant</a></div>'
+        )
+        if slug
+        else ""
+    )
+    return f"""<div class="card"><span class="score" title="match score">{t["score"]:.2f}</span>
+<h3><a href="{t["link"]}">{escape(t["title_en"] or t["title"])}</a></h3>
+<div class="meta"><b>{escape(t["buyer"] or "?")}</b> · {t["country"]} · value {money(t)} ·
+deadline <b>{t["deadline"] or "see notice"}</b> · published {t["published"]}</div><ul class="chips">{chips}</ul>{fb}</div>"""
 
 
 def rss(p: match.Profile, results: list[dict]) -> str:
-    now = format_datetime(dt.datetime.now(dt.timezone.utc))
-    items = "".join(f"""<item><title>{xesc(t['title_en'] or t['title'])}</title><link>{t['link']}</link>
-<guid isPermaLink="false">ted-{t['id']}</guid><pubDate>{format_datetime(dt.datetime.fromisoformat(t['published']).replace(tzinfo=dt.timezone.utc))}</pubDate>
+    now = format_datetime(dt.datetime.now(dt.UTC))
+    items = "".join(
+        f"""<item><title>{xesc(t["title_en"] or t["title"])}</title><link>{t["link"]}</link>
+<guid isPermaLink="false">ted-{t["id"]}</guid><pubDate>{format_datetime(dt.datetime.fromisoformat(t["published"]).replace(tzinfo=dt.UTC))}</pubDate>
 <description>{xesc(f"Score {t['score']:.2f}. Buyer: {t['buyer']} ({t['country']}). Value: {money(t)}. Deadline: {t['deadline'] or 'see notice'}. Why: {'; '.join(t['reasons'])}. Source: TED, © European Union.")}</description></item>"""
-                    for t in results)
+        for t in results
+    )
     return f"""<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel>
 <title>{xesc(p.name)} – tender-radar</title><link>{SITE_URL}/p/{p.slug}.html</link>
 <description>Open EU tenders matching this profile. Data: TED, © European Union. Unofficial.</description>
@@ -92,16 +104,17 @@ def profile_page(p: match.Profile, results: list[dict]) -> str:
     if p.countries:
         filt.append("countries " + ", ".join(p.countries))
     if p.min_value_eur or p.max_value_eur:
-        filt.append(f"value €{p.min_value_eur or 0:,.0f}–{('€' + format(p.max_value_eur, ',.0f')) if p.max_value_eur else 'any'} (unpublished values kept)")
+        filt.append(
+            f"value €{p.min_value_eur or 0:,.0f}–{('€' + format(p.max_value_eur, ',.0f')) if p.max_value_eur else 'any'} (unpublished values kept)"
+        )
     if p.exclude_keywords:
         filt.append("excluding " + ", ".join(p.exclude_keywords))
     body = f"""<p><a href="../index.html">← all profiles</a></p><h1>{escape(p.name)}</h1>
-<p>{escape(p.description)}</p><p class="meta">Filters: {escape('; '.join(filt) or 'none')}. Preferred CPV: {', '.join(p.cpv) or 'none'}.
+<p>{escape(p.description)}</p><p class="meta">Filters: {escape("; ".join(filt) or "none")}. Preferred CPV: {", ".join(p.cpv) or "none"}.
 <a href="{p.slug}.xml">RSS feed</a></p>
 <p class="meta">The 👍/👎 links open a public GitHub issue (needs a free GitHub account). Feedback becomes labels for the next evaluation round.</p>
-<h2>Top {len(results)} open tenders</h2>{''.join(card(t, p.slug) for t in results) or '<p>No open tenders match right now.</p>'}"""
-    return page(f"{p.name} – tender-radar", body,
-                f'<link rel="alternate" type="application/rss+xml" href="{p.slug}.xml">')
+<h2>Top {len(results)} open tenders</h2>{"".join(card(t, p.slug) for t in results) or "<p>No open tenders match right now.</p>"}"""
+    return page(f"{p.name} – tender-radar", body, f'<link rel="alternate" type="application/rss+xml" href="{p.slug}.xml">')
 
 
 INDEX_JS = """
@@ -127,14 +140,18 @@ document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{dir=sortKey=
 def row(r) -> str:
     """Same markup as INDEX_JS render(), so the server-rendered rows match the JS ones."""
     v = "–" if r["value_eur"] is None else f"€{round(r['value_eur']):,}"
-    return (f'<tr><td><a href="{escape(r["link"])}">{escape(r["title_en"] or "")}</a><div class=meta>{escape(r["buyer"] or "")}</div></td>'
-            f'<td>{r["country"]}</td><td class=num>{v}</td><td class=num>{r["deadline"] or "–"}</td><td class=num>{r["published"]}</td></tr>')
+    return (
+        f'<tr><td><a href="{escape(r["link"])}">{escape(r["title_en"] or "")}</a><div class=meta>{escape(r["buyer"] or "")}</div></td>'
+        f"<td>{r['country']}</td><td class=num>{v}</td><td class=num>{r['deadline'] or '–'}</td><td class=num>{r['published']}</td></tr>"
+    )
 
 
 def index_page(summaries, rows=()) -> str:
-    profs = "".join(f"""<div class="card"><h3><a href="p/{p.slug}.html">{escape(p.name)}</a></h3>
+    profs = "".join(
+        f"""<div class="card"><h3><a href="p/{p.slug}.html">{escape(p.name)}</a></h3>
 <div class="meta">{n} open tenders pass the filters · <a href="p/{p.slug}.xml">RSS</a></div><p class="meta">{escape(p.description)}</p></div>"""
-                    for p, n in summaries)
+        for p, n in summaries
+    )
     body = f"""<h1>tender-radar</h1>
 <p>Open EU public tenders in IT &amp; software services (CPV 72), ranked by fit for small businesses.
 Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-your-own-profile">Add your own profile</a>.</p>
@@ -150,7 +167,7 @@ Updated daily from TED. <a href="https://github.com/Jenoyrex/tender-radar#add-yo
 <label>Value known only<input id="f-known" type="checkbox"></label></div>
 <div class="tablewrap"><table><thead><tr><th data-k="title_en">Tender</th><th data-k="country">Country</th>
 <th data-k="value_eur">Value</th><th data-k="deadline">Deadline</th><th data-k="published">Published ▾</th></tr></thead>
-<tbody id="tb">{''.join(row(r) for r in rows[:50])}</tbody></table></div><p class="meta">Showing at most 300 rows; narrow with the filters.</p>
+<tbody id="tb">{"".join(row(r) for r in rows[:50])}</tbody></table></div><p class="meta">Showing at most 300 rows; narrow with the filters.</p>
 <script>{INDEX_JS}</script>"""
     return page("tender-radar – EU tenders for small businesses", body)
 
@@ -181,8 +198,7 @@ def build(tenders: list[dict], profiles_dir: Path, out: Path, method: str = "tfi
     keep = ("id", "title_en", "buyer", "country", "cpv", "value_eur", "deadline", "published", "link")
     # Newest first, matching the JS default sort, so server-rendered rows are what JS shows too.
     rows = sorted(({k: t[k] for k in keep} for t in open_), key=lambda r: r["published"], reverse=True)
-    (out / "tenders.json").write_text(json.dumps(rows, ensure_ascii=False,
-                                                 separators=(",", ":")), encoding="utf-8")
+    (out / "tenders.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     (out / "index.html").write_text(index_page(summaries, rows), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return open_

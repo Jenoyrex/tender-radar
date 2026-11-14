@@ -5,9 +5,15 @@ from tender_radar import company, match
 
 
 def award(nid, date, winners, title="Wartung GIS-System", country="DEU", cpv="72222300"):
-    return {"publication-number": nid, "publication-date": f"{date}+01:00", "winner-name": {"deu": winners},
-            "title-proc": {"deu": title}, "description-proc": {"deu": "Pflege und Weiterentwicklung " * 30},
-            "buyer-country": [country], "main-classification-proc": [cpv]}
+    return {
+        "publication-number": nid,
+        "publication-date": f"{date}+01:00",
+        "winner-name": {"deu": winners},
+        "title-proc": {"deu": title},
+        "description-proc": {"deu": "Pflege und Weiterentwicklung " * 30},
+        "buyer-country": [country],
+        "main-classification-proc": [cpv],
+    }
 
 
 NOTICES = [
