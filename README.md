@@ -3,19 +3,19 @@
 [![tests](https://github.com/Jenoyrex/tender-radar/actions/workflows/tests.yml/badge.svg)](https://github.com/Jenoyrex/tender-radar/actions/workflows/tests.yml)
 [![daily](https://github.com/Jenoyrex/tender-radar/actions/workflows/daily.yml/badge.svg)](https://github.com/Jenoyrex/tender-radar/actions/workflows/daily.yml)
 
-Find EU public tenders that fit your small business.
+A free daily shortlist of open EU public tenders for small IT companies. You
+describe your business in a few sentences, or just give your company name and
+tender-radar builds the description from your past EU contract wins. Every
+morning it pulls new calls for tender from TED, the EU's official procurement
+journal, drops the ones outside your countries and value range, ranks the rest
+by how well they fit, and publishes a web page and an RSS feed for you, each
+result with the reasons it matched. It runs entirely on free GitHub Actions and
+GitHub Pages, with no server and no paid API.
 
-You describe your business in a few sentences and set some filters (countries,
-contract value, words to avoid). Every day tender-radar pulls new calls for
-tender from TED, the EU's official procurement journal, ranks the open ones
-by fit, and publishes a web page and an RSS feed for your profile. Each result
-says why it matched.
+**Live site: https://jenoyrex.github.io/tender-radar/** ·
+**[Get my tender feed](https://github.com/Jenoyrex/tender-radar/issues/new?template=signup.yml)**
 
-**Live site: https://jenoyrex.github.io/tender-radar/**
-
-It costs nothing to run: the TED API is free and needs no key, matching uses
-small open-source models on CPU, and everything runs on GitHub Actions and
-GitHub Pages.
+![A profile page: the top open tenders for a small web studio in Portugal and Spain, each with its match score and reasons](docs/screenshot-profile.jpg)
 
 ## Pipeline
 
@@ -29,6 +29,11 @@ flowchart LR
   E --> F[HTML page + RSS<br>per profile]
   D --> G[index: filterable table<br>of open tenders]
   F & G --> H[GitHub Pages]
+  H --> L[link check]
+  I[issue form<br>sign-up / removal] -->|signup.yml| P
+  T[TED award notices<br>past wins] -->|profile from company name| P
+  T --> BT[backtest:<br>would we have shown<br>the tender they won?]
+  FB[feedback issues] --> FC[data/feedback.csv]
 ```
 
 | Step | Code |
@@ -38,7 +43,14 @@ flowchart LR
 | Storage | [`db.py`](src/tender_radar/db.py) |
 | Filters, scoring, reasons | [`match.py`](src/tender_radar/match.py) |
 | Pages and feeds | [`build.py`](src/tender_radar/build.py) |
-| Evaluation | [`evaluate.py`](src/tender_radar/evaluate.py) |
+| Award notices, winner-name normalisation, entity resolution | [`awards.py`](src/tender_radar/awards.py) |
+| Profile from a company's past wins | [`company.py`](src/tender_radar/company.py) |
+| Award-notice backtest (main evaluation) | [`backtest.py`](src/tender_radar/backtest.py) |
+| Older evaluations (CPV proxy, hand labels) | [`evaluate.py`](src/tender_radar/evaluate.py), [`evaluate_labels.py`](src/tender_radar/evaluate_labels.py) |
+| Self-serve sign-up, removal, abuse limits | [`signup.py`](src/tender_radar/signup.py) |
+| Feedback issues → CSV | [`feedback.py`](src/tender_radar/feedback.py) |
+| Published-site link checker | [`linkcheck.py`](src/tender_radar/linkcheck.py) |
+| Atomic UTF-8 file writes | [`util.py`](src/tender_radar/util.py) |
 
 What I found out about the API (field names, paging limits, quirks) is in
 [docs/data-source.md](docs/data-source.md).
@@ -112,12 +124,16 @@ To follow another sector, change `cpv_prefixes` in [`config.yaml`](config.yaml)
 ## Run it locally
 
 ```bash
-pip install -e ".[dev]"            # add ,embeddings for the sentence-transformers model
-tender-radar update                # backfill the last 60 days from TED (~2 min)
+pip install -e ".[dev]"            # add ,embeddings for the sentence-transformers models
+tender-radar update                # fetch the last 60 days from TED (~2 min)
 tender-radar build                 # writes site/
-tender-radar evaluate              # prints the evaluation tables (needs the embeddings extra)
-tender-radar label                 # hand-label the frozen queue in data/label-queue.csv
-pytest
+tender-radar profile-from-company "Example Software GmbH"   # print a profile YAML built from its TED wins
+tender-radar history               # 2 years of award notices + 2.5 years of contract notices (~1.5 h, polite)
+tender-radar backtest              # award backtest (needs the embeddings extra; --no-e5 skips that model)
+tender-radar feedback              # collect relevant / not relevant issues into data/feedback.csv
+tender-radar evaluate --labels     # older evaluation on hand labels
+pytest && ruff check . && ruff format --check .
+python -m tender_radar.linkcheck https://jenoyrex.github.io/tender-radar/
 ```
 
 ## Evaluation
@@ -164,10 +180,18 @@ so nothing changed. The full method, both tables and caveats are in
 ## Running costs
 
 Zero. The TED Search API is free and keyless. GitHub Actions minutes are free for
-public repositories; a daily run takes a few minutes. The SQLite database and model
-cache live in the Actions cache (rebuilt automatically if evicted); only a small CSV
-snapshot of open tenders ([`data/open-tenders.csv`](data/open-tenders.csv)) is
-committed each day, so the git history stays small.
+public repositories. Measured on 2026-11-14:
+
+| Workflow | Runtime | How often |
+|---|---|---|
+| `daily` (fetch, feedback, build, deploy, link check) | 3 min 01 s ([run](https://github.com/Jenoyrex/tender-radar/actions/runs/43578321013)) | once a day |
+| `signup` (validate, commit, rebuild via `daily`, reply) | 5 min 29 s ([run](https://github.com/Jenoyrex/tender-radar/actions/runs/43577844164)) | per sign-up batch, plus a sweep every 6 h (29 s when there is nothing to do, [run](https://github.com/Jenoyrex/tender-radar/actions/runs/43579747612)) |
+| `tests` (ruff + pytest) | ~30 s | per push |
+
+The SQLite database lives in the Actions cache (rebuilt from TED automatically if
+evicted); only small CSVs ([`data/open-tenders.csv`](data/open-tenders.csv),
+[`data/feedback.csv`](data/feedback.csv)) are committed each day, so the git history
+stays small. The two-year backtest history is built locally and never committed.
 
 ## Data and licence
 
