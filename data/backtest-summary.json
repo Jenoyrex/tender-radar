@@ -5,5 +5,7 @@
  "median": 9.0,
  "hit10_random": 0.13604488078541374,
  "hit10_cpv": 0.21598877980364656,
- "matcher": "char-tfidf + CPV boost (shipped)"
+ "matcher": "char-tfidf + CPV boost (shipped)",
+ "hit10_new_buyer": 0.45544554455445546,
+ "repeat_share": 0.2917251051893408
 }

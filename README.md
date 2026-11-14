@@ -155,9 +155,19 @@ made on dev.
 The shipped matcher beats both baselines clearly (95% bootstrap CIs well above
 zero). The e5 blend's +2 points has a CI from −0.3 to +4.3 points, so it does
 **not** clearly win and the simpler matcher stays (it also keeps PyTorch out of
-the daily job). Caveats: the lists were short (median ~136 open tenders, because
-the profile's countries come from the company's own wins), only the one tender the
-company actually won counts as a hit, and companies with many wins skew large.
+the daily job).
+
+Stress tests on the same companies (test half, shipped matcher, top-10 rate):
+
+| Harder setting | Top 10 | Random |
+|---|---|---|
+| Tenders from a buyer **new** to the company (72% of cases; dev + test) | 46% | 9% |
+| **Europe-wide** lists, no country filter (median 2,243 open tenders) | 47% | 0.7% |
+| **Cold start:** profile from one past win only | 42% | 14% |
+
+Caveats: only the one tender the company actually won counts as a hit, companies
+with many wins skew large, and a profile made from real tender text is still an
+optimistic stand-in for a newcomer's own few sentences.
 Method, all tables, a breakdown by company size, and the earlier label and CPV-proxy
 rounds are in [docs/evaluation.md](docs/evaluation.md); how winners were matched
 across notices is in [docs/entity-sample.md](docs/entity-sample.md). The story behind it, including what did not work: [docs/WRITEUP.md](docs/WRITEUP.md).

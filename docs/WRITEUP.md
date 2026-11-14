@@ -73,16 +73,17 @@ was published, and recorded where that tender ranked. On the held-out half: top 
 for 52% of companies, top 50 for 78%, against 14% for random order and 22% for
 ranking by CPV code alone.
 
-That is useful, and it is not as good as it sounds. The lists were short (about
-140 open tenders) because the countries came from the company's own history.
-Companies with many wins skew large. Follow-up contracts from the same buyer are
-easy to find by text similarity. And it says nothing about a first-time bidder who
-types three sentences, which is exactly who the product is for.
+I suspected that number flattered the matcher. With no
+country filter (about 2,200 open tenders instead of 140), the hit rate only fell to
+47%, while random fell below 1%. Repeat business is real: 28% of the won tenders
+came from a buyer the company already knew, and those are easier (68%), but for new
+buyers it was still 46%. A profile built from a single past win managed 42%.
+Companies with many wins skew large, and none of this tests a first-time bidder
+typing three sentences, which is exactly who the product is for.
 
 ## What I would do next
 
 Collect real feedback: the relevant / not-relevant links on every result now flow
-into a CSV each day, but nobody has clicked one yet. Measure how often the top 10
-contains a tender from a buyer the company has never worked with. Run the backtest
-from typed descriptions instead of past wins. And read national portals, because
-that is where most small contracts are.
+into a CSV each day, but nobody has clicked one yet. Test typed descriptions
+against the backtest. And read national portals, because that is where most small
+contracts are.
