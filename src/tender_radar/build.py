@@ -155,11 +155,13 @@ def headline_html(h: dict | None) -> str:
     """One honest sentence from data/backtest-summary.json (written by `tender-radar backtest`)."""
     if not h:
         return "<p>How well the ranking works is being measured; see the evaluation.</p>"
+    cpv = f", ranking by CPV code alone: {100 * h['hit10_cpv']:.0f}%" if "hit10_cpv" in h else ""
     return (
-        f"<p>We replayed history for <b>{h['companies']}</b> companies that won EU IT contracts: for each, we built a profile from "
-        f"its earlier wins and ranked the tenders that were open when its next win was published. That tender was in the "
-        f"top 10 for <b>{100 * h['hit10']:.0f}%</b> of companies (random order: {100 * h['hit10_random']:.0f}%) and in the top 50 "
-        f"for {100 * h['hit50']:.0f}%. Useful as a shortlist, not a guarantee.</p>"
+        f"<p>We replayed two years of EU IT contracts for <b>{h['companies']}</b> companies: for each, we built a profile "
+        f"from its earlier wins and ranked the tenders open in its countries when its next win was published (typically about 140). That tender was "
+        f"in the top 10 for <b>{100 * h['hit10']:.0f}%</b> of companies (random order: {100 * h['hit10_random']:.0f}%{cpv}) "
+        f"and in the top 50 for {100 * h['hit50']:.0f}%. We also tested multilingual AI embeddings; they did not clearly "
+        "do better, so the simpler text matcher stays. Useful as a shortlist, not a guarantee.</p>"
     )
 
 

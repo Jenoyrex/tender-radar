@@ -255,6 +255,22 @@ def to_markdown(results: list[dict], funnel: collections.Counter) -> str:
     return "\n".join(out) + "\n"
 
 
+def summary(results: list[dict]) -> dict:
+    """Test-half headline for the home page (data/backtest-summary.json). CURRENT is the matcher
+    config.yaml ships; if that ever changes, change both together (docs/evaluation.md)."""
+    test = [r for r in results if r["part"] == "test"]
+    m = metrics(test, CURRENT)
+    return {
+        "companies": m["n"],
+        "hit10": m["hit@10"],
+        "hit50": m["hit@50"],
+        "median": m["median"],
+        "hit10_random": metrics(test, "random")["hit@10"],
+        "hit10_cpv": metrics(test, "same-main-cpv")["hit@10"],
+        "matcher": CURRENT,
+    }
+
+
 def load(history_db: Path) -> tuple[list[dict], list[dict]]:
     con = db.connect(history_db)
     con.row_factory = sqlite3.Row

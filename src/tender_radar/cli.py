@@ -107,6 +107,8 @@ def cmd_backtest(cfg, args):
     saved = Path(cfg["history_db"]).parent / "backtest-results.json"
     if args.report_only:  # re-render from the last run without recomputing
         d = json.loads(saved.read_text(encoding="utf-8"))
+        summary = backtest.summary(d["results"])
+        util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(summary, indent=1) + "\n")
         sys.stdout.reconfigure(encoding="utf-8")
         print(backtest.to_markdown(d["results"], collections.Counter(d["funnel"])))
         return 0
@@ -124,18 +126,7 @@ def cmd_backtest(cfg, args):
     results, funnel = backtest.run(tenders, wins, vecs, query, min_wins=args.min_wins)
     out = Path(cfg["history_db"]).parent / "backtest-results.json"
     util.write_text(out, json.dumps({"funnel": funnel, "results": results}, default=str))
-    shipped = backtest.CURRENT  # the matcher config.yaml ships; update both together (docs/evaluation.md)
-    test = [r for r in results if r["part"] == "test"]
-    m, rnd = backtest.metrics(test, shipped), backtest.metrics(test, "random")
-    summary = {
-        "companies": m["n"],
-        "hit10": m["hit@10"],
-        "hit50": m["hit@50"],
-        "median": m["median"],
-        "hit10_random": rnd["hit@10"],
-        "matcher": shipped,
-        "date": dt.date.today().isoformat(),
-    }
+    summary = backtest.summary(results)
     util.write_text(ROOT / "data" / "backtest-summary.json", json.dumps(summary, indent=1) + "\n")
     sys.stdout.reconfigure(encoding="utf-8")
     print(backtest.to_markdown(results, funnel))

@@ -16,3 +16,5 @@ def test_headline_is_honest_about_pending_and_baseline():
     assert "being measured" in build.headline_html(None)
     h = build.headline_html({"companies": 120, "hit10": 0.183, "hit50": 0.4, "hit10_random": 0.004})
     assert "<b>120</b>" in h and "<b>18%</b>" in h and "random order: 0%" in h and "not a guarantee" in h
+    h = build.headline_html({"companies": 713, "hit10": 0.525, "hit50": 0.776, "hit10_random": 0.136, "hit10_cpv": 0.216})
+    assert "<b>52%</b>" in h and "random order: 14%" in h and "CPV code alone: 22%" in h and "simpler text matcher stays" in h
