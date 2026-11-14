@@ -1,4 +1,5 @@
 import argparse
+import collections
 import csv
 import datetime as dt
 import logging
@@ -103,6 +104,12 @@ def cmd_backtest(cfg, args):
 
     from . import backtest
 
+    saved = Path(cfg["history_db"]).parent / "backtest-results.json"
+    if args.report_only:  # re-render from the last run without recomputing
+        d = json.loads(saved.read_text(encoding="utf-8"))
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(backtest.to_markdown(d["results"], collections.Counter(d["funnel"])))
+        return 0
     tenders, wins = backtest.load(cfg["history_db"])
     vecs = query = None
     if not args.no_e5:
@@ -226,6 +233,7 @@ def main(argv=None):
     bt = sub.add_parser("backtest", help="award-notice backtest on history_db (prints markdown)")
     bt.add_argument("--no-e5", action="store_true", help="skip the multilingual-e5 matcher and blends")
     bt.add_argument("--min-wins", type=int, default=4)
+    bt.add_argument("--report-only", action="store_true", help="print the report from data/backtest-results.json")
     sub.add_parser("feedback", help="collect 👍/👎 feedback issues into data/feedback.csv")
     iss = sub.add_parser("issues", help="process open sign-up/removal issues (used by signup.yml)")
     iss.add_argument("--event", help="only this GitHub event JSON instead of sweeping all open requests")

@@ -119,3 +119,12 @@ def test_bootstrap_diff_ci_contains_the_mean():
     rs = [_res("test", {"a": 1 if i % 2 else 100, "b": 100}) for i in range(100)]
     diff, lo, hi = backtest.bootstrap_diff(rs, "a", "b")
     assert diff == 0.5 and lo < 0.5 < hi and lo > 0.3
+
+
+def test_to_markdown_labels_every_matcher():
+    cur = backtest.CURRENT
+    ms = {cur: 3, "char-tfidf": 2, "english-tfidf": 9, "e5": 4, "blend w=0.5": 1, "random": 30, "same-main-cpv": 8}
+    rs = [_res("dev", dict(ms)), _res("test", dict(ms))] * 3
+    md = backtest.to_markdown(rs, {"usable cases": 6})
+    assert "Baseline: random order" in md and "multilingual-e5-small" in md and "Blend w=0.5" in md
+    assert "chosen on dev" in md and "95% bootstrap CI" in md

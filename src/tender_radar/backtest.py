@@ -237,7 +237,7 @@ def to_markdown(results: list[dict], funnel: collections.Counter) -> str:
         ]
         for m in sorted(ms, key=lambda m: -metrics(rs, m)["hit@10"]):
             x = metrics(rs, m)
-            name = NAMES.get(m, f"Blend {m.split()[1]} × char-TF-IDF + rest × e5")
+            name = NAMES[m] if m in NAMES else f"Blend {m.split()[1]} × char-TF-IDF + rest × e5"
             mark = " ← chosen on dev" if m == chosen and part == "dev" else ""
             med = "∞ (miss)" if x["median"] == np.inf else f"{x['median']:.0f}"
             out.append(f"| {name}{mark} | {x['hit@10']:.3f} | {x['hit@50']:.3f} | {med} |")

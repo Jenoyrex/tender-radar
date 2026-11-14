@@ -9,12 +9,12 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [x] **A2** Entity report (distinct winners, companies with 4+ wins); gate ≥100 companies with 4+ linked wins
   (else widen and record); `docs/entity-sample.md` has 20 random groups, ≤2 of 20 judged wrongly merged.
   Check: report output pasted in docs/evaluation.md; my verdict per group written in entity-sample.md.
-- [ ] **A3** Backtest: profile = all wins but the latest; pool = notices open on the held-out notice's
+- [x] **A3** Backtest: profile = all wins but the latest; pool = notices open on the held-out notice's
   publication date, product filters; hit@10, hit@50, median rank for char-TF-IDF, English TF-IDF, e5, blend,
   random, same-main-CPV; dev/test split by company. Check: `tender-radar backtest` prints both tables; `pytest tests/test_backtest.py`.
-- [ ] **A4** New matcher shipped only if it clearly beats current on test, with bootstrap 95% CI on the difference.
+- [x] **A4** New matcher shipped only if it clearly beats current on test, with bootstrap 95% CI on the difference.
   Check: CI printed in evaluation.md; `config.yaml` / `match.py` agree with the decision.
-- [ ] **A5** docs/evaluation.md: backtest is the main section, label results secondary, limitations listed.
+- [x] **A5** docs/evaluation.md: backtest is the main section, label results secondary, limitations listed.
   Check: read the file top to bottom.
 - [x] **A6** award-backtest merged into main after tests + CI pass.
   Check: `gh run list --branch award-backtest` green; `git log main` contains the merge.

@@ -1,0 +1,9 @@
+{
+ "companies": 713,
+ "hit10": 0.5245441795231417,
+ "hit50": 0.7755960729312763,
+ "median": 9.0,
+ "hit10_random": 0.13604488078541374,
+ "matcher": "char-tfidf + CPV boost (shipped)",
+ "date": "2026-11-14"
+}
