@@ -23,17 +23,22 @@ LINE = re.compile(
 )
 
 
-def github_get(path: str, repo: str | None = None):
-    """GET from the GitHub REST API, authenticated when GITHUB_TOKEN is set."""
+def github_api(path: str, repo: str | None = None):
+    """GET https://api.github.com/<path>; '{repo}' in path becomes owner/name. Uses GITHUB_TOKEN when set."""
     repo = repo or os.environ.get("GITHUB_REPOSITORY", "Jenoyrex/tender-radar")
     req = urllib.request.Request(
-        f"https://api.github.com/repos/{repo}/{path}",
+        "https://api.github.com/" + path.replace("{repo}", repo),
         headers={"Accept": "application/vnd.github+json", "User-Agent": "tender-radar"},
     )
     if os.environ.get("GITHUB_TOKEN"):
         req.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
+
+
+def github_get(path: str, repo: str | None = None):
+    """GET from this repository's REST API (path relative to /repos/owner/name/)."""
+    return github_api("repos/{repo}/" + path, repo)
 
 
 def parse(issue: dict) -> dict | None:

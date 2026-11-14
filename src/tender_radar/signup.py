@@ -6,16 +6,22 @@ to YAML through yaml.safe_dump. Nothing is stored except what the person typed
 into the public issue, plus the issue number (so only they can remove it later).
 """
 
+import datetime as dt
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 
-from . import company
+from . import company, util
 
 SITE = "https://jenoyrex.github.io/tender-radar"
 SIGNUP_LABEL, REMOVE_LABEL = "signup", "remove-feed"
-MAX_PROFILES = 300  # ponytail: keeps the daily build well inside free Actions minutes; raise if it ever fills up
+# Abuse limits (README "Sign-up limits"). They also keep the daily build well inside free Actions minutes.
+MAX_PROFILES = 200  # hard cap on profiles, examples included
+MAX_PER_DAY = 20  # new sign-ups per UTC day, all users together
+MIN_ACCOUNT_DAYS = 7  # GitHub account age of the person signing up
+# plus: at most 1 active feed per GitHub user (checked against their own sign-up issues)
 
 COUNTRIES = {  # TED buyer countries offered in the form: EU 27 + EEA + CH + UK
     "AUT": "Austria",
@@ -127,9 +133,6 @@ def profile_from_issue(issue: dict, profiles_dir: Path, cfg: dict, lookup=compan
         for w in (x.strip() for x in re.split(r"[,;\n]+", _clean_text(f.get("Words to exclude", ""), "Words to exclude", 300)))
         if w
     ][:20]
-    if len(list(Path(profiles_dir).glob("*.yaml"))) >= MAX_PROFILES:
-        raise Rejected("tender-radar is full right now (free hosting limits). Sorry; please try again later.")
-
     prof = {
         "name": name or " ".join(desc.split()[:8]) + "…",
         "description": desc,
@@ -194,3 +197,86 @@ def signup_reply(slug: str, prof: dict) -> str:
         f"with issue number {prof['signup_issue']}.\n\n"
         "Data: TED, © European Union. tender-radar is unofficial; always read the official notice."
     )
+
+
+def _profiles(profiles_dir: Path) -> list[dict]:
+    return [yaml.safe_load(p.read_text(encoding="utf-8")) or {} for p in sorted(Path(profiles_dir).glob("*.yaml"))]
+
+
+def check_limits(issue: dict, profiles_dir: Path, gh, today: dt.date) -> None:
+    """Raise Rejected if this sign-up would break an abuse limit. `gh` answers two questions about
+    the GitHub user (account creation date, numbers of their sign-up issues); nothing is stored."""
+    profs = _profiles(profiles_dir)
+    if len(profs) >= MAX_PROFILES:
+        raise Rejected("tender-radar is full right now (free hosting limits). Sorry; please try again later.")
+    if sum(str(p.get("created")) == today.isoformat() for p in profs) >= MAX_PER_DAY:
+        raise Rejected(f"We already created {MAX_PER_DAY} feeds today, the daily limit. Please try again tomorrow.")
+    login = issue["user"]["login"]
+    created = dt.date.fromisoformat(gh.user_created(login)[:10])
+    if (today - created).days < MIN_ACCOUNT_DAYS:
+        raise Rejected(f"To limit spam, GitHub accounts must be at least {MIN_ACCOUNT_DAYS} days old to sign up.")
+    active = {p.get("signup_issue") for p in profs if p.get("signup_issue")}
+    mine = active & set(gh.signup_issue_numbers(login))
+    if mine:
+        raise Rejected(
+            f"You already have an active feed (sign-up issue #{min(mine)}). Each GitHub account can have one; "
+            "remove it first with a removal request if you want a new one."
+        )
+
+
+def handle(issue: dict, profiles_dir: Path, cfg: dict, gh, lookup=company, today: dt.date | None = None) -> dict:
+    """Process one sign-up or removal issue. Returns {number, action, slug, comment}; action is
+    created | removed | rejected | ignored. Changes profiles_dir on success."""
+    today = today or dt.date.today()
+    labels = {lb["name"] for lb in issue.get("labels", [])}
+    res = {"number": issue["number"], "action": "ignored", "slug": "", "comment": ""}
+    try:
+        if SIGNUP_LABEL in labels:
+            check_limits(issue, profiles_dir, gh, today)
+            slug, prof = profile_from_issue(issue, profiles_dir, cfg, lookup)
+            prof["created"] = today.isoformat()
+            util.write_text(Path(profiles_dir) / f"{slug}.yaml", company.to_yaml(prof))
+            res |= {"action": "created", "slug": slug, "comment": signup_reply(slug, prof)}
+        elif REMOVE_LABEL in labels:
+            path = removal_target(issue, profiles_dir)
+            n = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("signup_issue")
+            if not may_remove(issue, path, gh.issue_author(n) if n else None):
+                raise Rejected(f"Only the person who opened sign-up issue #{n} can remove this feed.")
+            path.unlink()
+            res |= {
+                "action": "removed",
+                "slug": path.stem,
+                "comment": f"Removed the feed `{path.stem}`. Its page disappears with the next site build (a few minutes).",
+            }
+    except Rejected as e:
+        res |= {
+            "action": "rejected",
+            "comment": f"Sorry, I couldn't process this request: {e}\n\nYou're welcome to open a new issue with the form.",
+        }
+    return res
+
+
+class GitHub:
+    """The few GitHub REST calls sign-up needs (public data; GITHUB_TOKEN raises the rate limit)."""
+
+    def __init__(self, get=None):
+        from .feedback import github_api
+
+        self.get = get or github_api
+
+    def user_created(self, login: str) -> str:
+        return self.get(f"users/{quote(login)}")["created_at"]
+
+    def signup_issue_numbers(self, login: str) -> list[int]:
+        q = f"issues?creator={quote(login)}&labels={SIGNUP_LABEL}&state=all&per_page=100"
+        return [i["number"] for i in self.get("repos/{repo}/" + q) if "pull_request" not in i]
+
+    def issue_author(self, n: int) -> str:
+        return self.get(f"repos/{{repo}}/issues/{int(n)}")["user"]["login"]
+
+    def open_requests(self) -> list[dict]:
+        """Open sign-up and removal issues, oldest first (the workflow processes them all, in order)."""
+        out = []
+        for label in (SIGNUP_LABEL, REMOVE_LABEL):
+            out += self.get(f"repos/{{repo}}/issues?labels={label}&state=open&per_page=100&sort=created&direction=asc")
+        return sorted((i for i in out if "pull_request" not in i), key=lambda i: i["number"])

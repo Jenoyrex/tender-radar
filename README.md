@@ -43,10 +43,48 @@ flowchart LR
 What I found out about the API (field names, paging limits, quirks) is in
 [docs/data-source.md](docs/data-source.md).
 
-## Add your own profile
+## Get your own feed
 
-Create a YAML file in [`profiles/`](profiles) and open a pull request (or fork
-the repo; the daily workflow runs on your fork too):
+Open the **[Get my tender feed](https://github.com/Jenoyrex/tender-radar/issues/new?template=signup.yml)**
+form (needs a free GitHub account). Give a company name, a few sentences about
+what you do, or both, plus countries and a value range. A bot (the
+[`signup`](.github/workflows/signup.yml) workflow) checks the input, writes
+`profiles/<name>-<issue>.yaml`, rebuilds the site, replies with your page and
+RSS links, and closes the issue, usually within a few minutes. With a company
+name, the profile is built from that company's past EU contract wins on TED
+(`tender-radar profile-from-company "<name>"` does the same locally).
+
+To delete it, open a
+[removal request](https://github.com/Jenoyrex/tender-radar/issues/new?template=remove.yml)
+with your sign-up issue number. Only the person who signed up (or a maintainer)
+can remove a feed.
+
+Privacy: issues are public. The profile file stores only what you typed, plus
+the sign-up issue number and date; no GitHub username or other personal data.
+
+### Sign-up limits
+
+To keep the service free (GitHub Actions minutes) and spam-free, the bot
+rejects a sign-up, with a polite explanation, when:
+
+| Limit | Value | Why |
+|---|---|---|
+| Active feeds per GitHub account | 1 | Checked against your own sign-up issues; remove the old feed first. |
+| New sign-ups per day (everyone) | 20 | Caps a burst of automated sign-ups. |
+| Feeds in total | 200 | Keeps the daily build well inside free limits. |
+| GitHub account age | ≥ 7 days | Throwaway accounts are the usual spam source. |
+| Content | description of 8+ words and at most 1,500 characters, no links, known countries, whole-euro values | Input validation. |
+
+Requests are processed one at a time (one GitHub concurrency group), and every
+run handles **all** open requests oldest first, so two sign-ups can never race
+each other's commits and none is lost if GitHub drops a queued run. A run every
+6 hours picks up anything missed. The limits live in
+[`signup.py`](src/tender_radar/signup.py).
+
+## Add a profile by pull request
+
+Or create a YAML file in [`profiles/`](profiles) yourself and open a pull request
+(or fork the repo; the daily workflow runs on your fork too):
 
 ```yaml
 name: Small web studio (Portugal & Spain)

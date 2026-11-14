@@ -1,21 +1,27 @@
 name: signup
 # Self-serve sign-up / removal from the issue forms in .github/ISSUE_TEMPLATE.
-# The issue text is untrusted: it only ever reaches Python through the event JSON file,
-# never a ${{ }} expression inside a shell command.
+# Each run processes EVERY open sign-up/removal issue, oldest first (`tender-radar issues`),
+# so no request is lost when GitHub's concurrency group replaces a pending run, and the
+# limits (README "Sign-up limits") see each previous sign-up. The schedule sweeps up anything missed.
+# Issue text is untrusted: it only reaches Python through the GitHub API, never a ${{ }} in a shell line.
 on:
   issues:
     types: [opened]
-concurrency: {group: profiles, cancel-in-progress: false}
+  schedule:
+    - cron: "41 */6 * * *"
+  workflow_dispatch:
+concurrency: {group: profiles, cancel-in-progress: false}   # one run at a time: no racing profile commits
 env:
   PYTHONUTF8: "1"   # UTF-8 for all text I/O, whatever the runner locale
 jobs:
   handle:
-    if: contains(github.event.issue.labels.*.name, 'signup') || contains(github.event.issue.labels.*.name, 'remove-feed')
+    if: github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'signup') || contains(github.event.issue.labels.*.name, 'remove-feed')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions: {contents: write, issues: read}
     outputs:
-      action: ${{ steps.run.outputs.action }}
+      changed: ${{ steps.run.outputs.changed }}
+      any: ${{ steps.run.outputs.any }}
     steps:
       - uses: actions/checkout@v7
         with: {ref: main}
@@ -25,29 +31,30 @@ jobs:
       - id: run
         env: {GITHUB_TOKEN: "${{ github.token }}"}
         run: |
-          tender-radar issue "$GITHUB_EVENT_PATH" --out "$RUNNER_TEMP/result.json"
-          echo "action=$(jq -r .action "$RUNNER_TEMP/result.json")" >> "$GITHUB_OUTPUT"
-          cp "$RUNNER_TEMP/result.json" result.json
-      - name: Commit profile change
-        if: steps.run.outputs.action == 'created' || steps.run.outputs.action == 'removed'
+          tender-radar issues --out result.json
+          echo "changed=$(jq '[.[] | select(.action == "created" or .action == "removed")] | length > 0' result.json)" >> "$GITHUB_OUTPUT"
+          echo "any=$(jq 'length > 0' result.json)" >> "$GITHUB_OUTPUT"
+      - name: Commit profile changes
+        if: steps.run.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A profiles
-          git commit -m "Profile $(jq -r .action result.json): $(jq -r .slug result.json) (issue #${{ github.event.issue.number }})"
-          git pull --rebase && git push
+          git commit -m "Self-serve profiles: $(jq -r '[.[] | select(.action == "created" or .action == "removed") | "\(.action) \(.slug) (#\(.number))"] | join(", ")' result.json)"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 10; done
       - uses: actions/upload-artifact@v5
+        if: steps.run.outputs.any == 'true'
         with: {name: result, path: result.json}
 
   deploy:
     needs: handle
-    if: needs.handle.outputs.action == 'created' || needs.handle.outputs.action == 'removed'
+    if: needs.handle.outputs.changed == 'true'
     uses: ./.github/workflows/daily.yml
     permissions: {contents: write, pages: write, id-token: write, issues: read}
 
   reply:
     needs: [handle, deploy]
-    if: always() && needs.handle.result == 'success' && needs.handle.outputs.action != 'ignored'
+    if: always() && needs.handle.result == 'success' && needs.handle.outputs.any == 'true'
     runs-on: ubuntu-latest
     permissions: {issues: write}
     steps:
@@ -56,16 +63,16 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          ISSUE: ${{ github.event.issue.number }}
           DEPLOYED: ${{ needs.deploy.result }}
         run: |
-          jq -r .comment result.json > comment.md
-          if [ "$(jq -r .action result.json)" != rejected ] && [ "$DEPLOYED" != success ]; then
-            printf '\n\n(The site rebuild did not finish just now; your change will appear after the next daily run.)\n' >> comment.md
-          fi
-          gh issue comment "$ISSUE" --body-file comment.md
-          if [ "$(jq -r .action result.json)" = rejected ]; then
-            gh issue close "$ISSUE" --reason "not planned"
-          else
-            gh issue close "$ISSUE" --reason completed
-          fi
+          for i in $(jq -r 'keys[]' result.json); do
+            n=$(jq -r ".[$i].number" result.json)
+            action=$(jq -r ".[$i].action" result.json)
+            [ "$action" = ignored ] && continue
+            jq -r ".[$i].comment" result.json > comment.md
+            if [ "$action" != rejected ] && [ "$DEPLOYED" != success ]; then
+              printf '\n\n(The site rebuild did not finish just now; your change will appear after the next daily run.)\n' >> comment.md
+            fi
+            gh issue comment "$n" --body-file comment.md
+            if [ "$action" = rejected ]; then gh issue close "$n" --reason "not planned"; else gh issue close "$n" --reason completed; fi
+          done

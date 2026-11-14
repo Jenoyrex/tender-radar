@@ -154,12 +154,6 @@ def cmd_profile_from_company(cfg, args):
     return 0
 
 
-def _github(path: str):
-    from .feedback import github_get
-
-    return github_get(path)
-
-
 def cmd_feedback(cfg, args):
     from . import feedback
 
@@ -169,44 +163,22 @@ def cmd_feedback(cfg, args):
     return 0
 
 
-def cmd_issue(cfg, args):
-    """Handle a sign-up / removal issue event. Writes a JSON result for the workflow:
-    {"action": "created"|"removed"|"rejected"|"ignored", "comment": str, "slug": str}."""
+def cmd_issues(cfg, args):
+    """Process sign-up / removal issues: the one in --event, or every open one (sweep, oldest first).
+    Writes a JSON list of {number, action, slug, comment} for the workflow to reply to."""
     import json
 
-    import yaml
+    from . import signup
 
-    from . import company, signup
-
-    issue = json.loads(Path(args.event).read_text(encoding="utf-8"))["issue"]
-    labels = {lb["name"] for lb in issue.get("labels", [])}
-    profiles = ROOT / "profiles"
-    res = {"action": "ignored", "comment": "", "slug": ""}
-    try:
-        if signup.SIGNUP_LABEL in labels:
-            slug, prof = signup.profile_from_issue(issue, profiles, cfg)
-            util.write_text(profiles / f"{slug}.yaml", company.to_yaml(prof))
-            res = {"action": "created", "comment": signup.signup_reply(slug, prof), "slug": slug}
-        elif signup.REMOVE_LABEL in labels:
-            path = signup.removal_target(issue, profiles)
-            n = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("signup_issue")
-            author = _github(f"issues/{n}")["user"]["login"] if n else None
-            if not signup.may_remove(issue, path, author):
-                raise signup.Rejected(f"Only the person who opened sign-up issue #{n} can remove this feed.")
-            path.unlink()
-            res = {
-                "action": "removed",
-                "slug": path.stem,
-                "comment": f"Removed the feed `{path.stem}`. Its page disappears with the next site build (a few minutes).",
-            }
-    except signup.Rejected as e:
-        res = {
-            "action": "rejected",
-            "comment": f"Sorry, I couldn't process this request: {e}\n\nYou're welcome to open a new issue with the form.",
-            "slug": "",
-        }
-    util.write_text(args.out, json.dumps(res))
-    log.info("issue #%s: %s %s", issue.get("number"), res["action"], res["slug"])
+    gh = signup.GitHub()
+    if args.event:
+        issues = [json.loads(Path(args.event).read_text(encoding="utf-8"))["issue"]]
+    else:
+        issues = gh.open_requests()
+    results = [signup.handle(i, ROOT / "profiles", cfg, gh) for i in issues]
+    util.write_text(args.out, json.dumps(results))
+    for r in results:
+        log.info("issue #%s: %s %s", r["number"], r["action"], r["slug"])
     return 0
 
 
@@ -255,8 +227,8 @@ def main(argv=None):
     bt.add_argument("--no-e5", action="store_true", help="skip the multilingual-e5 matcher and blends")
     bt.add_argument("--min-wins", type=int, default=4)
     sub.add_parser("feedback", help="collect 👍/👎 feedback issues into data/feedback.csv")
-    iss = sub.add_parser("issue", help="handle a sign-up/removal GitHub issue event (used by signup.yml)")
-    iss.add_argument("event", help="path to the GitHub event JSON")
+    iss = sub.add_parser("issues", help="process open sign-up/removal issues (used by signup.yml)")
+    iss.add_argument("--event", help="only this GitHub event JSON instead of sweeping all open requests")
     iss.add_argument("--out", default="issue-result.json")
     args = p.parse_args(argv)
     cfg = load_config()
@@ -269,7 +241,7 @@ def main(argv=None):
         "label": cmd_label,
         "history": cmd_history,
         "profile-from-company": cmd_profile_from_company,
-        "issue": cmd_issue,
+        "issues": cmd_issues,
         "feedback": cmd_feedback,
         "backtest": cmd_backtest,
     }
