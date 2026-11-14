@@ -17,7 +17,7 @@ jobs:
     concurrency: {group: pages-deploy, cancel-in-progress: false}
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
+    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}"}
     steps:
       - uses: actions/checkout@v7
         with: {ref: main}   # tip of main, so a profile committed moments ago is included
@@ -46,10 +46,19 @@ jobs:
         with: {path: site}
       - uses: actions/deploy-pages@v5
         id: deployment
+        continue-on-error: true   # its artifact lookup fails intermittently ("No artifacts named github-pages")
+      - name: Wait before retrying the Pages deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - uses: actions/deploy-pages@v5
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true   # still commit data and save the cache; the last step fails the run
       - name: Check the published site for broken links
         id: links
+        if: steps.deployment.outcome == 'success' || steps.deployment_retry.outcome == 'success'
         continue-on-error: true
-        run: python -m tender_radar.linkcheck "${{ steps.deployment.outputs.page_url }}"
+        run: python -m tender_radar.linkcheck "${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}"
       - name: Commit dataset snapshot
         run: |
           git config user.name "github-actions[bot]"
@@ -57,6 +66,6 @@ jobs:
           git add data/open-tenders.csv data/feedback.csv
           git diff --cached --quiet || git commit -m "Daily data update $(date -u +%F)"
           git pull --rebase --autostash && git push
-      - name: Fail the run if fetching or the link check failed (triggers GitHub's failure email)
-        if: steps.update.outcome == 'failure' || steps.links.outcome == 'failure'
+      - name: Fail the run if fetching, deploying or the link check failed (triggers GitHub's failure email)
+        if: steps.update.outcome == 'failure' || steps.links.outcome == 'failure' || (steps.deployment.outcome == 'failure' && steps.deployment_retry.outcome != 'success')
         run: exit 1
