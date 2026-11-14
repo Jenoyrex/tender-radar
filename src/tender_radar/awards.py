@@ -12,6 +12,7 @@ import re
 import sqlite3
 import unicodedata
 
+from . import db
 from .clean import SchemaError, _date
 
 DESC_CHARS = 300  # per win in a profile; long descriptions would drown the titles
@@ -326,11 +327,16 @@ def report(con: sqlite3.Connection, n_notices: int) -> str:
 
 
 def store(con: sqlite3.Connection, wins: list[dict]) -> None:
-    """Replace the wins table with `wins`, entity numbers included."""
+    """Refresh the wins table from `wins` (it is fully derived from the raw award cache).
+    Schema changes only add columns; the refresh is one transaction, so a failure keeps the old rows."""
     for w, e in zip(wins, resolve(wins), strict=True):
         w["entity"] = e
-    with con:
-        con.execute("DROP TABLE IF EXISTS wins")
-        con.executescript(SCHEMA)
-        cols = WIN_COLUMNS + ["entity"]
+    cols = WIN_COLUMNS + ["entity"]
+    create_table, *indexes = [x for x in SCHEMA.split(";") if x.strip()]
+    con.execute(create_table)
+    db.ensure_columns(con, "wins", {c: ("REAL" if c == "value" else "INTEGER" if c == "entity" else "TEXT") for c in cols})
+    for stmt in indexes:  # after the migration: an index may need a column it just added
+        con.execute(stmt)
+    with con:  # executescript would auto-commit; plain execute keeps this one transaction
+        con.execute("DELETE FROM wins")
         con.executemany(f"INSERT OR REPLACE INTO wins ({', '.join(cols)}) VALUES ({', '.join(':' + c for c in cols)})", wins)

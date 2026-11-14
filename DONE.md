@@ -41,7 +41,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [ ] **C7** v1.0.0 release with notes. Check: `gh release view v1.0.0`.
 
 ## D. Robustness (added 2026-11-14)
-- [ ] **D1** Non-destructive schema changes: `db.connect` never drops a table with data (ALTER TABLE ADD COLUMN);
+- [x] **D1** Non-destructive schema changes: `db.connect` never drops a table with data (ALTER TABLE ADD COLUMN);
   same for history.sqlite. Check: `pytest tests/test_db.py` opens an old-schema DB with rows, rows survive.
 - [x] **D2** UTF-8 everywhere: explicit `encoding="utf-8"` on all text I/O, `PYTHONUTF8=1` in workflows, a ruff rule
   catching missing encodings, atomic writes (temp file + rename). Check: `ruff check` with the rule enabled;
