@@ -36,6 +36,7 @@ def connect(path) -> sqlite3.Connection:
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)  # CREATE ... IF NOT EXISTS: a no-op on an existing table
     ensure_columns(con, "tenders", {c: col_type(c) for c in COLUMNS[1:]})
+    con.execute("CREATE INDEX IF NOT EXISTS ix_procedure ON tenders(procedure_id)")  # after the migration adds it
     return con
 
 

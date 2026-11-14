@@ -227,3 +227,6 @@ data/raw/
 site/
 .env
 .claude/
+data/history.sqlite
+data/emb-e5-history.npz
+data/backtest-results.json

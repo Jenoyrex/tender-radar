@@ -12,3 +12,9 @@ request_delay_seconds: 1.5
 # Matcher: "tfidf" (character 3-5-gram TF-IDF, chosen by docs/evaluation.md) or "embeddings"
 # (needs: pip install -e ".[embeddings]").
 match_method: tfidf
+# Backtest history (tender-radar history): award notices for this many days, and
+# competition notices a further history_lead_days before that so awards can be linked
+# back to their original notice. Local only; data/history.sqlite is not committed.
+history_db: data/history.sqlite
+history_days: 730
+history_lead_days: 180

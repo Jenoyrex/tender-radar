@@ -162,6 +162,9 @@ LEGAL_SUFFIXES = sorted(
     key=lambda s: -len(s),
 )  # longest first, so "gmbh co kg" wins over "kg"
 
+# Legal forms written BEFORE the name (Lithuania, Latvia, Estonia, some Nordic/Czech usage).
+LEGAL_PREFIXES = {"uab", "ab", "sia", "as", "ou", "vsi", "ao", "oy", "aps"}
+
 _ID_JUNK = re.compile(r"[^0-9A-Z]")
 
 
@@ -180,6 +183,9 @@ def normalise_name(name: str) -> str:
             if s.endswith(" " + suf):
                 s, changed = s[: -len(suf) - 1].strip(), True
                 break
+    words = s.split(" ")
+    if len(words) > 1 and words[0] in LEGAL_PREFIXES:  # Baltic/Nordic style: "UAB Bitė Lietuva"
+        s = " ".join(words[1:])
     return s
 
 
@@ -283,7 +289,8 @@ def report(con: sqlite3.Connection, n_notices: int) -> str:
     prev = q("SELECT count(DISTINCT notice_id) FROM wins WHERE prev_notice_id IS NOT NULL")
     prev_found = q("""SELECT count(DISTINCT w.notice_id) FROM wins w JOIN tenders t ON t.id = w.prev_notice_id""")
     either = q("""SELECT count(DISTINCT w.notice_id) FROM wins w WHERE
-                  EXISTS (SELECT 1 FROM tenders t WHERE t.procedure_id = w.procedure_id OR t.id = w.prev_notice_id)""")
+                  EXISTS (SELECT 1 FROM tenders t WHERE t.procedure_id = w.procedure_id)
+                  OR EXISTS (SELECT 1 FROM tenders t WHERE t.id = w.prev_notice_id)""")
     per_entity = """SELECT entity, count(DISTINCT coalesce(procedure_id, notice_id)) n FROM wins GROUP BY entity"""
     ents = q("SELECT count(DISTINCT entity) FROM wins")
     names = q("SELECT count(DISTINCT winner_country || '|' || winner_name) FROM wins")
