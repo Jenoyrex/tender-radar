@@ -263,7 +263,7 @@ def to_markdown(results: list[dict], funnel: collections.Counter) -> str:
         filt = sum(r["filtered_out"] for r in rs)
         out += [
             f"#### {part.upper()} half: {len(rs)} companies, median pool {np.median(pools):.0f} open notices; "
-            f"held-out tender removed by the profile's country filter for {filt} ({100 * filt / max(len(rs), 1):.0f}%)",
+            f"held-out tender removed by the profile's filters (country, deadline) for {filt} ({100 * filt / max(len(rs), 1):.0f}%)",
             "",
             "| Matcher | hit@10 | hit@50 | median rank |",
             "|---|---|---|---|",
@@ -317,7 +317,7 @@ def summary(results: list[dict]) -> dict:
     config.yaml ships; if that ever changes, change both together (docs/evaluation.md)."""
     test = [r for r in results if r["part"] == "test"]
     m = metrics(test, CURRENT)
-    return {
+    out = {
         "companies": m["n"],
         "hit10": m["hit@10"],
         "hit50": m["hit@50"],
@@ -326,6 +326,11 @@ def summary(results: list[dict]) -> dict:
         "hit10_cpv": metrics(test, "same-main-cpv")["hit@10"],
         "matcher": CURRENT,
     }
+    new = [r for r in test if r.get("repeat_buyer") is False]
+    if new:  # tenders from a buyer the company had never won from: the harder, more useful case
+        out["hit10_new_buyer"] = metrics(new, CURRENT)["hit@10"]
+        out["repeat_share"] = 1 - len(new) / len(test)
+    return out
 
 
 def load(history_db: Path) -> tuple[list[dict], list[dict]]:

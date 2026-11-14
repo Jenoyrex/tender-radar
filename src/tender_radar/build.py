@@ -156,11 +156,17 @@ def headline_html(h: dict | None) -> str:
     if not h:
         return "<p>How well the ranking works is being measured; see the evaluation.</p>"
     cpv = f", ranking by CPV code alone: {100 * h['hit10_cpv']:.0f}%" if "hit10_cpv" in h else ""
+    new = (
+        f" Some of those wins were repeat business with a buyer the company already knew; for tenders from a buyer "
+        f"new to the company, the top-10 rate was {100 * h['hit10_new_buyer']:.0f}%."
+        if "hit10_new_buyer" in h
+        else ""
+    )
     return (
         f"<p>We replayed two years of EU IT contracts for <b>{h['companies']}</b> companies: for each, we built a profile "
         f"from its earlier wins and ranked the tenders open in its countries when its next win was published (typically about 140). That tender was "
         f"in the top 10 for <b>{100 * h['hit10']:.0f}%</b> of companies (random order: {100 * h['hit10_random']:.0f}%{cpv}) "
-        f"and in the top 50 for {100 * h['hit50']:.0f}%. We also tested multilingual AI embeddings; they did not clearly "
+        f"and in the top 50 for {100 * h['hit50']:.0f}%.{new} We also tested multilingual AI embeddings; they did not clearly "
         "do better, so the simpler text matcher stays. Useful as a shortlist, not a guarantee.</p>"
     )
 
