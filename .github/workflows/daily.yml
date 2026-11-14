@@ -8,6 +8,7 @@ permissions:
   contents: write   # commit data/open-tenders.csv
   pages: write
   id-token: write
+  issues: read      # tender-radar feedback
 concurrency: {group: daily, cancel-in-progress: false}
 jobs:
   update:
@@ -33,6 +34,10 @@ jobs:
         id: update
         continue-on-error: true   # still rebuild the site from what we have; fail at the end
         run: tender-radar update
+      - name: Collect feedback issues
+        continue-on-error: true   # never block the site on the GitHub API
+        env: {GITHUB_TOKEN: "${{ github.token }}"}
+        run: tender-radar feedback
       - run: tender-radar build
       - uses: actions/upload-pages-artifact@v5
         with: {path: site}
@@ -42,7 +47,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/open-tenders.csv
+          git add data/open-tenders.csv data/feedback.csv
           git diff --cached --quiet || git commit -m "Daily data update $(date -u +%F)"
           git pull --rebase && git push
       - name: Fail the run if fetching failed (triggers GitHub's failure email)

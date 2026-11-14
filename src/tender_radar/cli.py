@@ -113,16 +113,16 @@ def cmd_profile_from_company(cfg, args):
 
 
 def _github(path: str):
-    """GET from the GitHub REST API (GITHUB_TOKEN if set)."""
-    import json
-    import os
-    import urllib.request
-    req = urllib.request.Request(f"https://api.github.com/repos/{os.environ.get('GITHUB_REPOSITORY', 'Jenoyrex/tender-radar')}/{path}",
-                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "tender-radar"})
-    if os.environ.get("GITHUB_TOKEN"):
-        req.add_header("Authorization", f"Bearer {os.environ['GITHUB_TOKEN']}")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+    from .feedback import github_get
+    return github_get(path)
+
+
+def cmd_feedback(cfg, args):
+    from . import feedback
+    rows = feedback.fetch_all()
+    feedback.write(rows, ROOT / "data" / "feedback.csv")
+    print(feedback.report(rows))
+    return 0
 
 
 def cmd_issue(cfg, args):
@@ -199,6 +199,7 @@ def main(argv=None):
     pc = sub.add_parser("profile-from-company", help="build a profile YAML from a company's past TED wins")
     pc.add_argument("name")
     pc.add_argument("--write", action="store_true", help="save to profiles/<slug>.yaml instead of printing")
+    sub.add_parser("feedback", help="collect 👍/👎 feedback issues into data/feedback.csv")
     iss = sub.add_parser("issue", help="handle a sign-up/removal GitHub issue event (used by signup.yml)")
     iss.add_argument("event", help="path to the GitHub event JSON")
     iss.add_argument("--out", default="issue-result.json")
@@ -207,7 +208,8 @@ def main(argv=None):
     for k in ("db_path", "raw_dir", "site_dir", "history_db"):
         cfg[k] = ROOT / cfg[k]
     cmds = {"update": cmd_update, "build": cmd_build, "evaluate": cmd_evaluate, "label": cmd_label,
-            "history": cmd_history, "profile-from-company": cmd_profile_from_company, "issue": cmd_issue}
+            "history": cmd_history, "profile-from-company": cmd_profile_from_company, "issue": cmd_issue,
+            "feedback": cmd_feedback}
     sys.exit(cmds[args.cmd](cfg, args))
 
 

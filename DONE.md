@@ -24,7 +24,7 @@ Each item is ticked only after its check has been run and passed. `py` below is
 - [ ] **B2** Issue-form sign-up → Action validates, writes `profiles/<slug>.yaml`, builds, comments links, closes; rejects invalid/spam.
   Check: `pytest tests/test_signup.py`; a real test issue on GitHub gets a comment and is closed.
 - [ ] **B3** Removal via issue form → profile deleted. Check: `pytest tests/test_signup.py -k remove`; real issue closes the test profile.
-- [ ] **B4** Feedback issues → `data/feedback.csv` + counts; in the daily workflow.
+- [x] **B4** Feedback issues → `data/feedback.csv` + counts; in the daily workflow.
   Check: `pytest tests/test_feedback.py`; `tender-radar feedback` runs against GitHub; step present in daily.yml.
 - [ ] **B5** Home page explains what/who/how to sign up and shows the backtest headline.
   Check: open the built `site/index.html` and read it.

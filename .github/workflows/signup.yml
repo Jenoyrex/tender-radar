@@ -41,7 +41,7 @@ jobs:
     needs: handle
     if: needs.handle.outputs.action == 'created' || needs.handle.outputs.action == 'removed'
     uses: ./.github/workflows/daily.yml
-    permissions: {contents: write, pages: write, id-token: write}
+    permissions: {contents: write, pages: write, id-token: write, issues: read}
 
   reply:
     needs: [handle, deploy]
