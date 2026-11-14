@@ -43,6 +43,10 @@ jobs:
         with: {path: site}
       - uses: actions/deploy-pages@v5
         id: deployment
+      - name: Check the published site for broken links
+        id: links
+        continue-on-error: true
+        run: python -m tender_radar.linkcheck "${{ steps.deployment.outputs.page_url }}"
       - name: Commit dataset snapshot
         run: |
           git config user.name "github-actions[bot]"
@@ -50,6 +54,6 @@ jobs:
           git add data/open-tenders.csv data/feedback.csv
           git diff --cached --quiet || git commit -m "Daily data update $(date -u +%F)"
           git pull --rebase && git push
-      - name: Fail the run if fetching failed (triggers GitHub's failure email)
-        if: steps.update.outcome == 'failure'
+      - name: Fail the run if fetching or the link check failed (triggers GitHub's failure email)
+        if: steps.update.outcome == 'failure' || steps.links.outcome == 'failure'
         run: exit 1
